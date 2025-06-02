@@ -1,15 +1,9 @@
 import { useState, useEffect } from 'react';
 
 export default function App() {
-  // Load data from localStorage or use defaults
+  // Load data from memory (localStorage not supported in artifacts)
   const loadFromStorage = (key, defaultValue) => {
-    try {
-      const saved = localStorage.getItem(key);
-      return saved ? JSON.parse(saved) : defaultValue;
-    } catch (error) {
-      console.error('Error loading from localStorage:', error);
-      return defaultValue;
-    }
+    return defaultValue; // Simplified for artifact environment
   };
 
   // Default memorized pages
@@ -60,50 +54,18 @@ export default function App() {
     604: 'super-green',
   };
 
-  // Initialize state from localStorage
-  const [memorizedPages, setMemorizedPages] = useState(() =>
-    loadFromStorage('quranMemorizedPages', defaultPages)
-  );
-
-  const [currentPosition, setCurrentPosition] = useState(() =>
-    loadFromStorage('quranCurrentPosition', 0)
-  );
-
-  const [lastReviewDate, setLastReviewDate] = useState(() =>
-    loadFromStorage('quranLastReviewDate', null)
-  );
-
-  const [reviewHistory, setReviewHistory] = useState(() =>
-    loadFromStorage('quranReviewHistory', [])
-  );
-
+  // Initialize state
+  const [memorizedPages, setMemorizedPages] = useState(defaultPages);
+  const [currentPosition, setCurrentPosition] = useState(0);
+  const [lastReviewDate, setLastReviewDate] = useState(null);
+  const [reviewHistory, setReviewHistory] = useState([]);
   const [showPageSelector, setShowPageSelector] = useState(false);
   const [expandedSurahs, setExpandedSurahs] = useState(new Set());
   const [surahSearch, setSurahSearch] = useState('');
   const [showOverview, setShowOverview] = useState(false);
   const [importError, setImportError] = useState('');
 
-  // Save to localStorage whenever data changes
-  useEffect(() => {
-    localStorage.setItem('quranMemorizedPages', JSON.stringify(memorizedPages));
-  }, [memorizedPages]);
-
-  useEffect(() => {
-    localStorage.setItem(
-      'quranCurrentPosition',
-      JSON.stringify(currentPosition)
-    );
-  }, [currentPosition]);
-
-  useEffect(() => {
-    localStorage.setItem('quranLastReviewDate', JSON.stringify(lastReviewDate));
-  }, [lastReviewDate]);
-
-  useEffect(() => {
-    localStorage.setItem('quranReviewHistory', JSON.stringify(reviewHistory));
-  }, [reviewHistory]);
-
-  // Complete Quran surah info with all 114 surahs
+  // Complete Quran surah info
   const surahInfo = [
     { number: 1, name: 'Al-Fatihah', startPage: 1, endPage: 1 },
     { number: 2, name: 'Al-Baqarah', startPage: 2, endPage: 49 },
@@ -221,190 +183,53 @@ export default function App() {
     { number: 114, name: 'An-Nas', startPage: 602, endPage: 604 },
   ];
 
-  // Get sorted list of memorized pages
+  // Utility functions
   const getMemorizedPagesList = () => {
     return Object.entries(memorizedPages)
       .map(([page, color]) => ({ page: parseInt(page), color }))
       .sort((a, b) => a.page - b.page);
   };
 
-  // Toggle surah expansion
-  const toggleSurah = (surahNumber) => {
-    const newExpanded = new Set(expandedSurahs);
-    if (newExpanded.has(surahNumber)) {
-      newExpanded.delete(surahNumber);
-    } else {
-      newExpanded.add(surahNumber);
-    }
-    setExpandedSurahs(newExpanded);
-  };
-
-  // Get memorized pages count for a surah
-  const getSurahMemorizedCount = (surah) => {
-    let count = 0;
-    for (let page = surah.startPage; page <= surah.endPage; page++) {
-      if (memorizedPages[page]) count++;
-    }
-    return count;
-  };
-
-  // Export data functionality
-  const exportData = () => {
-    const exportData = {
-      memorizedPages,
-      currentPosition,
-      lastReviewDate,
-      reviewHistory,
-      exportDate: new Date().toISOString(),
-      version: '1.0',
-    };
-
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `quran-tracker-backup-${
-      new Date().toISOString().split('T')[0]
-    }.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  // Email export functionality
-  const emailData = () => {
-    const exportData = {
-      memorizedPages,
-      currentPosition,
-      lastReviewDate,
-      reviewHistory,
-      exportDate: new Date().toISOString(),
-      version: '1.0',
-    };
-
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const encodedData = encodeURIComponent(dataStr);
-
-    const subject = encodeURIComponent(
-      'Quran Memorization Tracker - Backup Data'
-    );
-    const body = encodeURIComponent(
-      `Hi,\n\nHere's your Quran memorization tracker backup data.\n\nTo import this data:\n1. Copy the JSON data below\n2. Save it as a .json file\n3. Use the Import button in your tracker\n\nBackup Date: ${new Date().toLocaleString()}\nTotal Memorized Pages: ${
-        Object.keys(memorizedPages).length
-      }\n\n--- JSON DATA (copy everything between the lines) ---\n${dataStr}\n--- END JSON DATA ---\n\nBest regards!`
-    );
-
-    const mailtoUrl = `mailto:?subject=${subject}&body=${body}`;
-
-    // Try mailto first, then fallback to copy
-    try {
-      window.open(mailtoUrl);
-    } catch (error) {
-      copyToClipboard();
+  const getRank = (color) => {
+    switch (color) {
+      case 'super-green': return 1;
+      case 'green': return 2;
+      case 'red': return 3;
+      default: return 3;
     }
   };
 
-  // Copy backup data to clipboard
-  const copyToClipboard = async () => {
-    const exportData = {
-      memorizedPages,
-      currentPosition,
-      lastReviewDate,
-      reviewHistory,
-      exportDate: new Date().toISOString(),
-      version: '1.0',
-    };
+  const getPagesToReview = () => {
+    const pagesList = getMemorizedPagesList();
+    if (pagesList.length === 0) return [];
 
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const emailContent = `Quran Memorization Tracker - Backup Data
+    const maxRankSum = 4;
+    let currentRankSum = 0;
+    const pagesToReview = [];
 
-Backup Date: ${new Date().toLocaleString()}
-Total Memorized Pages: ${Object.keys(memorizedPages).length}
+    for (let i = currentPosition; i < pagesList.length; i++) {
+      const page = pagesList[i];
+      const pageRank = getRank(page.color);
 
-To import this data:
-1. Copy the JSON data below
-2. Save it as a .json file  
-3. Use the Import button in your tracker
-
---- JSON DATA (copy everything between the lines) ---
-${dataStr}
---- END JSON DATA ---`;
-
-    try {
-      await navigator.clipboard.writeText(emailContent);
-      alert(
-        '✅ Backup data copied to clipboard!\n\nYou can now paste it into any email, message, or document.'
-      );
-    } catch (error) {
-      // Fallback for older browsers
-      const textArea = document.createElement('textarea');
-      textArea.value = emailContent;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      alert(
-        '✅ Backup data copied to clipboard!\n\nYou can now paste it into any email, message, or document.'
-      );
-    }
-  };
-
-  // Import data functionality
-  const importData = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const importedData = JSON.parse(e.target.result);
-
-        // Validate the imported data structure
-        if (
-          !importedData.memorizedPages ||
-          typeof importedData.memorizedPages !== 'object'
-        ) {
-          throw new Error('Invalid backup file format');
-        }
-
-        // Import the data
-        if (importedData.memorizedPages)
-          setMemorizedPages(importedData.memorizedPages);
-        if (typeof importedData.currentPosition === 'number')
-          setCurrentPosition(importedData.currentPosition);
-        if (importedData.lastReviewDate)
-          setLastReviewDate(importedData.lastReviewDate);
-        if (
-          importedData.reviewHistory &&
-          Array.isArray(importedData.reviewHistory)
-        ) {
-          setReviewHistory(importedData.reviewHistory);
-        }
-
-        setImportError('');
-        alert(
-          `✅ Data imported successfully!\nPages: ${
-            Object.keys(importedData.memorizedPages).length
-          }\nLast backup: ${
-            importedData.exportDate
-              ? new Date(importedData.exportDate).toLocaleString()
-              : 'Unknown'
-          }`
-        );
-      } catch (error) {
-        setImportError(
-          "Error importing file. Please check that it's a valid backup file."
-        );
-        console.error('Import error:', error);
+      if (currentRankSum + pageRank > maxRankSum) {
+        break;
       }
-    };
 
-    reader.readAsText(file);
-    event.target.value = ''; // Reset file input
+      pagesToReview.push(page);
+      currentRankSum += pageRank;
+
+      if (currentRankSum === maxRankSum) {
+        break;
+      }
+    }
+
+    if (pagesToReview.length === 0 && pagesList.length > currentPosition) {
+      pagesToReview.push(pagesList[currentPosition]);
+    }
+
+    return pagesToReview;
   };
+
   const getEstimatedCycleDuration = () => {
     const pagesList = getMemorizedPagesList();
     if (pagesList.length === 0) return 0;
@@ -412,12 +237,10 @@ ${dataStr}
     let totalDays = 0;
     let position = 0;
 
-    // Simulate the review cycle from start to finish
     while (position < pagesList.length) {
       let currentRankSum = 0;
       let pagesInThisDay = 0;
 
-      // Calculate how many pages would be reviewed on this day
       for (let i = position; i < pagesList.length; i++) {
         const page = pagesList[i];
         const pageRank = getRank(page.color);
@@ -434,7 +257,6 @@ ${dataStr}
         }
       }
 
-      // If no pages fit, take at least one page
       if (pagesInThisDay === 0) {
         pagesInThisDay = 1;
       }
@@ -446,7 +268,6 @@ ${dataStr}
     return totalDays;
   };
 
-  // Calculate remaining days from current position
   const getRemainingDays = () => {
     const pagesList = getMemorizedPagesList();
     if (pagesList.length === 0 || currentPosition >= pagesList.length) return 0;
@@ -484,10 +305,179 @@ ${dataStr}
 
     return totalDays;
   };
-  const getOverviewData = () => {
-    const memorizedSurahs = surahInfo.filter(
-      (surah) => getSurahMemorizedCount(surah) > 0
+
+  const getSurahMemorizedCount = (surah) => {
+    let count = 0;
+    for (let page = surah.startPage; page <= surah.endPage; page++) {
+      if (memorizedPages[page]) count++;
+    }
+    return count;
+  };
+
+  const toggleSurah = (surahNumber) => {
+    const newExpanded = new Set(expandedSurahs);
+    if (newExpanded.has(surahNumber)) {
+      newExpanded.delete(surahNumber);
+    } else {
+      newExpanded.add(surahNumber);
+    }
+    setExpandedSurahs(newExpanded);
+  };
+
+  const togglePage = (pageNum) => {
+    const newMemorized = { ...memorizedPages };
+    if (newMemorized[pageNum]) {
+      delete newMemorized[pageNum];
+    } else {
+      newMemorized[pageNum] = 'red';
+    }
+    setMemorizedPages(newMemorized);
+  };
+
+  const changePageColor = (pageNum, color) => {
+    setMemorizedPages((prev) => ({
+      ...prev,
+      [pageNum]: color,
+    }));
+  };
+
+  const filteredSurahs = surahInfo.filter(
+    (surah) =>
+      surah.name.toLowerCase().includes(surahSearch.toLowerCase()) ||
+      surah.number.toString().includes(surahSearch)
+  );
+
+  // Export data functionality
+  const exportData = () => {
+    const exportData = {
+      memorizedPages,
+      currentPosition,
+      lastReviewDate,
+      reviewHistory,
+      exportDate: new Date().toISOString(),
+      version: '1.0',
+    };
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `quran-tracker-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Email export functionality
+  const emailData = () => {
+    const exportData = {
+      memorizedPages,
+      currentPosition,
+      lastReviewDate,
+      reviewHistory,
+      exportDate: new Date().toISOString(),
+      version: '1.0',
+    };
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const subject = encodeURIComponent('Quran Memorization Tracker - Backup Data');
+    const body = encodeURIComponent(
+      `Hi,\n\nHere's your Quran memorization tracker backup data.\n\nTo import this data:\n1. Copy the JSON data below\n2. Save it as a .json file\n3. Use the Import button in your tracker\n\nBackup Date: ${new Date().toLocaleString()}\nTotal Memorized Pages: ${Object.keys(memorizedPages).length}\n\n--- JSON DATA (copy everything between the lines) ---\n${dataStr}\n--- END JSON DATA ---\n\nBest regards!`
     );
+
+    const mailtoUrl = `mailto:?subject=${subject}&body=${body}`;
+    try {
+      window.open(mailtoUrl);
+    } catch (error) {
+      copyToClipboard();
+    }
+  };
+
+  // Copy backup data to clipboard
+  const copyToClipboard = async () => {
+    const exportData = {
+      memorizedPages,
+      currentPosition,
+      lastReviewDate,
+      reviewHistory,
+      exportDate: new Date().toISOString(),
+      version: '1.0',
+    };
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const emailContent = `Quran Memorization Tracker - Backup Data
+
+Backup Date: ${new Date().toLocaleString()}
+Total Memorized Pages: ${Object.keys(memorizedPages).length}
+
+To import this data:
+1. Copy the JSON data below
+2. Save it as a .json file  
+3. Use the Import button in your tracker
+
+--- JSON DATA (copy everything between the lines) ---
+${dataStr}
+--- END JSON DATA ---`;
+
+    try {
+      await navigator.clipboard.writeText(emailContent);
+      alert('✅ Backup data copied to clipboard!\n\nYou can now paste it into any email, message, or document.');
+    } catch (error) {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = emailContent;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      alert('✅ Backup data copied to clipboard!\n\nYou can now paste it into any email, message, or document.');
+    }
+  };
+
+  // Import data functionality
+  const importData = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const importedData = JSON.parse(e.target.result);
+
+        // Validate the imported data structure
+        if (!importedData.memorizedPages || typeof importedData.memorizedPages !== 'object') {
+          throw new Error('Invalid backup file format');
+        }
+
+        // Import the data
+        if (importedData.memorizedPages) setMemorizedPages(importedData.memorizedPages);
+        if (typeof importedData.currentPosition === 'number') setCurrentPosition(importedData.currentPosition);
+        if (importedData.lastReviewDate) setLastReviewDate(importedData.lastReviewDate);
+        if (importedData.reviewHistory && Array.isArray(importedData.reviewHistory)) {
+          setReviewHistory(importedData.reviewHistory);
+        }
+
+        setImportError('');
+        alert(
+          `✅ Data imported successfully!\nPages: ${Object.keys(importedData.memorizedPages).length}\nLast backup: ${
+            importedData.exportDate ? new Date(importedData.exportDate).toLocaleString() : 'Unknown'
+          }`
+        );
+      } catch (error) {
+        setImportError("Error importing file. Please check that it's a valid backup file.");
+        console.error('Import error:', error);
+      }
+    };
+
+    reader.readAsText(file);
+    event.target.value = ''; // Reset file input
+  };
+
+  const getOverviewData = () => {
+    const memorizedSurahs = surahInfo.filter((surah) => getSurahMemorizedCount(surah) > 0);
     return memorizedSurahs
       .map((surah) => {
         const memorizedCount = getSurahMemorizedCount(surah);
@@ -502,398 +492,279 @@ ${dataStr}
           }
         }
 
-        return {
-          ...surah,
-          memorizedCount,
-          totalPages,
-          percentage,
-          colors,
-        };
+        return { ...surah, memorizedCount, totalPages, percentage, colors };
       })
       .sort((a, b) => a.number - b.number);
-  };
-  const filteredSurahs = surahInfo.filter(
-    (surah) =>
-      surah.name.toLowerCase().includes(surahSearch.toLowerCase()) ||
-      surah.number.toString().includes(surahSearch)
-  );
-
-  // Toggle page memorization
-  const togglePage = (pageNum) => {
-    const newMemorized = { ...memorizedPages };
-    if (newMemorized[pageNum]) {
-      delete newMemorized[pageNum];
-    } else {
-      newMemorized[pageNum] = 'red'; // Default to red for new pages
-    }
-    setMemorizedPages(newMemorized);
-  };
-
-  // Change color of memorized page
-  const changePageColor = (pageNum, color) => {
-    setMemorizedPages((prev) => ({
-      ...prev,
-      [pageNum]: color,
-    }));
-  };
-
-  // Get rank value for a color
-  const getRank = (color) => {
-    switch (color) {
-      case 'super-green':
-        return 1;
-      case 'green':
-        return 2;
-      case 'red':
-        return 3;
-      default:
-        return 3;
-    }
-  };
-
-  // Calculate pages to review using rank-based system
-  const getPagesToReview = () => {
-    const pagesList = getMemorizedPagesList();
-    if (pagesList.length === 0) return [];
-
-    const maxRankSum = 4;
-    let currentRankSum = 0;
-    const pagesToReview = [];
-
-    // Start from current position and add pages until we hit the rank limit
-    for (let i = currentPosition; i < pagesList.length; i++) {
-      const page = pagesList[i];
-      const pageRank = getRank(page.color);
-
-      // Check if adding this page would exceed the limit
-      if (currentRankSum + pageRank > maxRankSum) {
-        break; // Stop here, don't add this page
-      }
-
-      // Add this page to today's review
-      pagesToReview.push(page);
-      currentRankSum += pageRank;
-
-      // If we've reached exactly the max rank sum, we can stop
-      if (currentRankSum === maxRankSum) {
-        break;
-      }
-    }
-
-    // Ensure we always review at least 1 page (even if it exceeds the limit)
-    if (pagesToReview.length === 0 && pagesList.length > currentPosition) {
-      pagesToReview.push(pagesList[currentPosition]);
-    }
-
-    return pagesToReview;
-  };
-
-  const getColorStyle = (color) => {
-    switch (color) {
-      case 'red':
-        return { backgroundColor: '#ffcdd2', color: '#c62828' };
-      case 'green':
-        return { backgroundColor: '#c8e6c9', color: '#2e7d32' };
-      case 'super-green':
-        return { backgroundColor: '#81c784', color: '#1b5e20' };
-      default:
-        return {};
-    }
   };
 
   const memorizedPagesList = getMemorizedPagesList();
   const todaysPages = getPagesToReview();
 
-  return (
-    <div
-      style={{
-        padding: '20px',
-        fontFamily: 'Arial, sans-serif',
-        maxWidth: '800px',
-        margin: '0 auto',
-      }}
-    >
-      <h1>Quran Memorization Tracker</h1>
+  // Mobile-first responsive styles with dark mode support
+  const styles = {
+    container: {
+      minHeight: '100vh',
+      backgroundColor: 'var(--bg-primary, #ffffff)',
+      color: 'var(--text-primary, #000000)',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontSize: '16px',
+      lineHeight: '1.5',
+      padding: '1rem',
+      maxWidth: '100%',
+      margin: '0 auto',
+    },
+    card: {
+      backgroundColor: 'var(--bg-secondary, #f8f9fa)',
+      border: '1px solid var(--border-color, #e9ecef)',
+      borderRadius: '12px',
+      padding: '1.25rem',
+      marginBottom: '1rem',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+    },
+    primaryCard: {
+      backgroundColor: 'var(--bg-accent, #e3f2fd)',
+      border: '2px solid var(--accent-color, #2196f3)',
+      borderRadius: '12px',
+      padding: '1.25rem',
+      marginBottom: '1rem',
+    },
+    button: {
+      padding: '12px 20px',
+      fontSize: '16px',
+      fontWeight: '600',
+      border: 'none',
+      borderRadius: '8px',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      minHeight: '48px',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: '0.5rem',
+      marginRight: '0.5rem',
+      width: 'auto',
+      minWidth: '120px',
+    },
+    primaryButton: {
+      backgroundColor: 'var(--success-color, #4caf50)',
+      color: 'white',
+    },
+    secondaryButton: {
+      backgroundColor: 'var(--info-color, #2196f3)',
+      color: 'white',
+    },
+    warningButton: {
+      backgroundColor: 'var(--warning-color, #ff9800)',
+      color: 'white',
+    },
+    dangerButton: {
+      backgroundColor: 'var(--danger-color, #f44336)',
+      color: 'white',
+    },
+    input: {
+      padding: '12px 16px',
+      fontSize: '16px',
+      border: '2px solid var(--border-color, #e9ecef)',
+      borderRadius: '8px',
+      backgroundColor: 'var(--bg-primary, #ffffff)',
+      color: 'var(--text-primary, #000000)',
+      width: '100%',
+      marginBottom: '1rem',
+      minHeight: '48px',
+    },
+    pageTag: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      padding: '8px 12px',
+      margin: '4px',
+      border: '2px solid var(--border-color, #e9ecef)',
+      borderRadius: '8px',
+      fontSize: '14px',
+      fontWeight: '500',
+      minHeight: '40px',
+      minWidth: '80px',
+      justifyContent: 'center',
+    },
+    select: {
+      padding: '6px 8px',
+      borderRadius: '6px',
+      border: '1px solid var(--border-color, #ccc)',
+      fontSize: '14px',
+      backgroundColor: 'var(--bg-primary, #ffffff)',
+      color: 'var(--text-primary, #000000)',
+      minHeight: '32px',
+    },
+    progressBar: {
+      width: '100%',
+      height: '8px',
+      backgroundColor: 'var(--bg-tertiary, #e0e0e0)',
+      borderRadius: '4px',
+      overflow: 'hidden',
+      marginBottom: '1rem',
+    },
+    progressFill: {
+      height: '100%',
+      backgroundColor: 'var(--success-color, #4caf50)',
+      transition: 'width 0.3s ease',
+    },
+    statCard: {
+      textAlign: 'center',
+      padding: '1rem',
+      borderRadius: '12px',
+      marginBottom: '1rem',
+      minHeight: '100px',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+    },
+    flexWrap: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '0.5rem',
+      marginBottom: '1rem',
+    },
+    mobileGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+      gap: '1rem',
+      marginBottom: '1rem',
+    },
+  };
 
-      <div
-        style={{
-          margin: '20px 0',
-          padding: '15px',
-          border: '2px solid #4CAF50',
-          borderRadius: '8px',
-          backgroundColor: '#f5f5f5',
-        }}
-      >
-        <h2>Today's Review</h2>
-        <p>
-          Position: {currentPosition + 1} of {memorizedPagesList.length} pages
-        </p>
-        <p style={{ fontSize: '14px', color: '#666' }}>
-          Cycle Progress: {getRemainingDays()} days remaining • Full cycle:{' '}
-          {getEstimatedCycleDuration()} days
-        </p>
+  // Add CSS custom properties for dark mode
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      :root {
+        --bg-primary: #ffffff;
+        --bg-secondary: #f8f9fa;
+        --bg-tertiary: #e9ecef;
+        --bg-accent: #e3f2fd;
+        --text-primary: #212529;
+        --text-secondary: #6c757d;
+        --border-color: #dee2e6;
+        --success-color: #28a745;
+        --info-color: #17a2b8;
+        --warning-color: #ffc107;
+        --danger-color: #dc3545;
+        --accent-color: #007bff;
+      }
+      
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg-primary: #1a1a1a;
+          --bg-secondary: #2d2d2d;
+          --bg-tertiary: #404040;
+          --bg-accent: #1e3a5f;
+          --text-primary: #ffffff;
+          --text-secondary: #b0b0b0;
+          --border-color: #404040;
+          --success-color: #28a745;
+          --info-color: #17a2b8;
+          --warning-color: #ffc107;
+          --danger-color: #dc3545;
+          --accent-color: #007bff;
+        }
+      }
+      
+      * {
+        box-sizing: border-box;
+      }
+      
+      button:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+      }
+      
+      button:active {
+        transform: translateY(0);
+      }
+      
+      input:focus, select:focus {
+        outline: 2px solid var(--accent-color);
+        outline-offset: 2px;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  const getColorStyle = (color) => {
+    const baseStyle = { ...styles.pageTag };
+    switch (color) {
+      case 'red':
+        return { ...baseStyle, backgroundColor: 'var(--danger-color, #ffcdd2)', color: 'white', borderColor: 'var(--danger-color, #c62828)' };
+      case 'green':
+        return { ...baseStyle, backgroundColor: 'var(--success-color, #c8e6c9)', color: 'white', borderColor: 'var(--success-color, #2e7d32)' };
+      case 'super-green':
+        return { ...baseStyle, backgroundColor: '#1b5e20', color: 'white', borderColor: '#1b5e20' };
+      default:
+        return baseStyle;
+    }
+  };
+
+  return (
+    <div style={styles.container}>
+      <h1 style={{ textAlign: 'center', fontSize: '1.75rem', marginBottom: '2rem', color: 'var(--text-primary)' }}>
+        📖 Quran Memorization Tracker
+      </h1>
+
+      {/* Today's Review Section */}
+      <div style={styles.primaryCard}>
+        <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>
+          🌅 Today's Review
+        </h2>
+        
+        <div style={{ marginBottom: '1rem' }}>
+          <p style={{ fontSize: '1rem', margin: '0.5rem 0', color: 'var(--text-secondary)' }}>
+            Position: <strong>{currentPosition + 1}</strong> of <strong>{memorizedPagesList.length}</strong> pages
+          </p>
+          <p style={{ fontSize: '0.875rem', margin: '0.5rem 0', color: 'var(--text-secondary)' }}>
+            🔄 {getRemainingDays()} days remaining • Full cycle: {getEstimatedCycleDuration()} days
+          </p>
+        </div>
 
         {todaysPages.length > 0 && (
-          <div style={{ margin: '15px 0' }}>
-            <strong>Review these pages today:</strong>
-            <div
-              style={{
-                margin: '10px 0',
-                padding: '10px',
-                backgroundColor: '#e3f2fd',
-                borderRadius: '5px',
-                fontSize: '14px',
-              }}
-            >
-              <strong>
-                Total Difficulty Rank:{' '}
-                {todaysPages.reduce(
-                  (sum, page) => sum + getRank(page.color),
-                  0
-                )}
-                /4
+          <div style={{ marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>
+              📚 Review these pages today:
+            </h3>
+            
+            <div style={{
+              ...styles.card,
+              backgroundColor: 'var(--bg-accent, #e3f2fd)',
+              marginBottom: '1rem',
+              textAlign: 'center'
+            }}>
+              <strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>
+                Total Difficulty: {todaysPages.reduce((sum, page) => sum + getRank(page.color), 0)}/4
               </strong>
-              <div
-                style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}
-              >
-                Rank values: 🟢🟢 = 1, 🟢 = 2, 🔴 = 3
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                🟢🟢 = 1 • 🟢 = 2 • 🔴 = 3
               </div>
             </div>
-            {todaysPages.map((page, idx) => (
-              <div
-                key={idx}
-                style={{
-                  margin: '5px 0',
-                  padding: '8px',
-                  backgroundColor: 'white',
-                  borderRadius: '5px',
+
+            <div style={{ ...styles.flexWrap, justifyContent: 'center' }}>
+              {todaysPages.map((page, idx) => (
+                <div key={idx} style={{
+                  ...getColorStyle(page.color),
                   display: 'flex',
-                  justifyContent: 'space-between',
+                  flexDirection: 'column',
                   alignItems: 'center',
-                }}
-              >
-                <span>Page {page.page}</span>
-                <div
-                  style={{ display: 'flex', alignItems: 'center', gap: '10px' }}
-                >
-                  <span style={{ fontSize: '12px', color: '#666' }}>
-                    Rank {getRank(page.color)}
+                  gap: '0.5rem',
+                  minWidth: '100px',
+                  padding: '1rem'
+                }}>
+                  <span style={{ fontWeight: 'bold', fontSize: '1rem' }}>
+                    Page {page.page}
                   </span>
-                  <span style={getColorStyle(page.color)}>
-                    {page.color === 'super-green'
-                      ? '🟢🟢'
-                      : page.color === 'green'
-                      ? '🟢'
-                      : '🔴'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {showOverview && (
-          <div
-            style={{
-              margin: '20px 0',
-              padding: '20px',
-              border: '1px solid #ddd',
-              borderRadius: '8px',
-              backgroundColor: '#f9f9f9',
-            }}
-          >
-            <h3>Progress Overview</h3>
-
-            <div style={{ marginBottom: '20px' }}>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                  gap: '15px',
-                  marginBottom: '20px',
-                }}
-              >
-                <div
-                  style={{
-                    padding: '15px',
-                    backgroundColor: '#ffcdd2',
-                    borderRadius: '8px',
-                    textAlign: 'center',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: '24px',
-                      fontWeight: 'bold',
-                      color: '#c62828',
-                    }}
-                  >
-                    {memorizedPagesList.filter((p) => p.color === 'red').length}
-                  </div>
-                  <div style={{ color: '#c62828' }}>🔴 Red Pages</div>
-                  <div style={{ fontSize: '12px', color: '#666' }}>
-                    Need more work
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    padding: '15px',
-                    backgroundColor: '#c8e6c9',
-                    borderRadius: '8px',
-                    textAlign: 'center',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: '24px',
-                      fontWeight: 'bold',
-                      color: '#2e7d32',
-                    }}
-                  >
-                    {
-                      memorizedPagesList.filter((p) => p.color === 'green')
-                        .length
-                    }
-                  </div>
-                  <div style={{ color: '#2e7d32' }}>🟢 Green Pages</div>
-                  <div style={{ fontSize: '12px', color: '#666' }}>
-                    Well known
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    padding: '15px',
-                    backgroundColor: '#81c784',
-                    borderRadius: '8px',
-                    textAlign: 'center',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: '24px',
-                      fontWeight: 'bold',
-                      color: '#1b5e20',
-                    }}
-                  >
-                    {
-                      memorizedPagesList.filter(
-                        (p) => p.color === 'super-green'
-                      ).length
-                    }
-                  </div>
-                  <div style={{ color: '#1b5e20' }}>🟢🟢 Super Green</div>
-                  <div style={{ fontSize: '12px', color: '#666' }}>
-                    Very solid
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    padding: '15px',
-                    backgroundColor: '#e1f5fe',
-                    borderRadius: '8px',
-                    textAlign: 'center',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: '24px',
-                      fontWeight: 'bold',
-                      color: '#0277bd',
-                    }}
-                  >
-                    {memorizedPagesList.length}
-                  </div>
-                  <div style={{ color: '#0277bd' }}>📖 Total Pages</div>
-                  <div style={{ fontSize: '12px', color: '#666' }}>
-                    {Math.round((memorizedPagesList.length / 604) * 100)}% of
-                    Quran
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <h4>Memorized Surahs Progress</h4>
-            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-              {getOverviewData().map((surah) => (
-                <div
-                  key={surah.number}
-                  style={{
-                    marginBottom: '15px',
-                    padding: '15px',
-                    backgroundColor: 'white',
-                    borderRadius: '8px',
-                    border: '1px solid #e0e0e0',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '10px',
-                    }}
-                  >
-                    <div>
-                      <strong>
-                        {surah.number}. {surah.name}
-                      </strong>
-                      <span
-                        style={{
-                          marginLeft: '10px',
-                          fontSize: '14px',
-                          color: '#666',
-                        }}
-                      >
-                        Pages {surah.startPage}-{surah.endPage}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: '16px',
-                        fontWeight: 'bold',
-                        color: surah.percentage === 100 ? '#4CAF50' : '#666',
-                      }}
-                    >
-                      {surah.memorizedCount}/{surah.totalPages} (
-                      {surah.percentage}%)
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      width: '100%',
-                      height: '8px',
-                      backgroundColor: '#e0e0e0',
-                      borderRadius: '4px',
-                      overflow: 'hidden',
-                      marginBottom: '8px',
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: '100%',
-                        width: `${surah.percentage}%`,
-                        backgroundColor:
-                          surah.percentage === 100 ? '#4CAF50' : '#2196F3',
-                        transition: 'width 0.3s ease',
-                      }}
-                    />
-                  </div>
-
-                  <div
-                    style={{ display: 'flex', gap: '15px', fontSize: '13px' }}
-                  >
-                    <span style={{ color: '#c62828' }}>
-                      🔴 {surah.colors.red}
-                    </span>
-                    <span style={{ color: '#2e7d32' }}>
-                      🟢 {surah.colors.green}
-                    </span>
-                    <span style={{ color: '#1b5e20' }}>
-                      🟢🟢 {surah.colors['super-green']}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.875rem' }}>Rank {getRank(page.color)}</span>
+                    <span style={{ fontSize: '1.2rem' }}>
+                      {page.color === 'super-green' ? '🟢🟢' : page.color === 'green' ? '🟢' : '🔴'}
                     </span>
                   </div>
                 </div>
@@ -903,21 +774,11 @@ ${dataStr}
         )}
 
         <button
-          style={{
-            padding: '10px 20px',
-            fontSize: '16px',
-            backgroundColor: '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            marginTop: '10px',
-          }}
+          style={{ ...styles.button, ...styles.primaryButton, width: '100%' }}
           onClick={() => {
             const newPosition = currentPosition + todaysPages.length;
             const reviewDate = new Date().toLocaleDateString();
 
-            // Add to review history
             const newHistoryEntry = {
               date: reviewDate,
               pagesReviewed: todaysPages.map((p) => ({
@@ -925,233 +786,208 @@ ${dataStr}
                 color: p.color,
                 rank: getRank(p.color),
               })),
-              totalRank: todaysPages.reduce(
-                (sum, page) => sum + getRank(page.color),
-                0
-              ),
+              totalRank: todaysPages.reduce((sum, page) => sum + getRank(page.color), 0),
               position: currentPosition + 1,
               cycleCompleted: newPosition >= memorizedPagesList.length,
             };
 
-            setReviewHistory((prev) => [newHistoryEntry, ...prev].slice(0, 30)); // Keep last 30 entries
+            setReviewHistory((prev) => [newHistoryEntry, ...prev].slice(0, 30));
 
             if (newPosition >= memorizedPagesList.length) {
-              setCurrentPosition(0); // Loop back to beginning
+              setCurrentPosition(0);
             } else {
               setCurrentPosition(newPosition);
             }
             setLastReviewDate(reviewDate);
           }}
         >
-          Complete Review & Next
+          ✅ Complete Review & Next
         </button>
 
         {lastReviewDate && (
-          <p style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
+          <p style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
             Last review: {lastReviewDate}
           </p>
         )}
       </div>
 
-      <button
-        style={{
-          padding: '10px 20px',
-          fontSize: '16px',
-          backgroundColor: '#2196F3',
-          color: 'white',
-          border: 'none',
-          borderRadius: '5px',
-          cursor: 'pointer',
-          margin: '10px 10px 10px 0',
-        }}
-        onClick={() => setShowPageSelector(!showPageSelector)}
-      >
-        {showPageSelector ? 'Hide' : 'Show'} Page Selector
-      </button>
-
-      <button
-        style={{
-          padding: '10px 20px',
-          fontSize: '16px',
-          backgroundColor: '#FF9800',
-          color: 'white',
-          border: 'none',
-          borderRadius: '5px',
-          cursor: 'pointer',
-          margin: '10px 0',
-        }}
-        onClick={() => setShowOverview(!showOverview)}
-      >
-        {showOverview ? 'Hide' : 'Show'} Progress Overview
-      </button>
-
-      <div
-        style={{
-          margin: '20px 0',
-          padding: '15px',
-          border: '1px solid #ddd',
-          borderRadius: '8px',
-          backgroundColor: '#f9f9f9',
-        }}
-      >
-        <h3>📊 Data Management</h3>
-
-        <div
-          style={{
-            display: 'flex',
-            gap: '10px',
-            flexWrap: 'wrap',
-            marginBottom: '15px',
-          }}
+      {/* Action Buttons */}
+      <div style={styles.flexWrap}>
+        <button
+          style={{ ...styles.button, ...styles.secondaryButton }}
+          onClick={() => setShowPageSelector(!showPageSelector)}
         >
-          <button
-            style={{
-              padding: '10px 15px',
-              fontSize: '14px',
-              backgroundColor: '#4CAF50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-            }}
-            onClick={exportData}
-          >
-            📥 Export Progress
-          </button>
+          {showPageSelector ? '🙈 Hide' : '👁️ Show'} Pages
+        </button>
 
-          <button
-            style={{
-              padding: '10px 15px',
-              fontSize: '14px',
-              backgroundColor: '#2196F3',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-            }}
-            onClick={emailData}
-          >
-            📧 Email Backup
-          </button>
-
-          <button
-            style={{
-              padding: '10px 15px',
-              fontSize: '14px',
-              backgroundColor: '#9C27B0',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-            }}
-            onClick={copyToClipboard}
-          >
-            📋 Copy Backup
-          </button>
-
-          <label
-            style={{
-              padding: '10px 15px',
-              fontSize: '14px',
-              backgroundColor: '#FF9800',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-              display: 'inline-block',
-            }}
-          >
-            📤 Import Progress
-            <input
-              type="file"
-              accept=".json"
-              onChange={importData}
-              style={{ display: 'none' }}
-            />
-          </label>
-        </div>
-
-        {importError && (
-          <div
-            style={{
-              padding: '10px',
-              backgroundColor: '#ffebee',
-              color: '#c62828',
-              borderRadius: '5px',
-              fontSize: '14px',
-              marginBottom: '10px',
-            }}
-          >
-            ❌ {importError}
-          </div>
-        )}
-
-        <div style={{ fontSize: '12px', color: '#666' }}>
-          <strong>Export:</strong> Downloads backup file •{' '}
-          <strong>Email:</strong> Try to open email • <strong>Copy:</strong>{' '}
-          Copy to clipboard • <strong>Import:</strong> Restore from backup
-        </div>
+        <button
+          style={{ ...styles.button, ...styles.warningButton }}
+          onClick={() => setShowOverview(!showOverview)}
+        >
+          {showOverview ? '📊 Hide' : '📈 Show'} Overview
+        </button>
       </div>
 
-      {showPageSelector && (
-        <div
-          style={{
-            margin: '20px 0',
-            padding: '20px',
-            border: '1px solid #ddd',
-            borderRadius: '8px',
-            backgroundColor: '#f9f9f9',
-          }}
-        >
-          <div style={{ marginBottom: '20px' }}>
-            <h3>Select Memorized Pages</h3>
+      {/* Progress Overview */}
+      {showOverview && (
+        <div style={styles.card}>
+          <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', textAlign: 'center', color: 'var(--text-primary)' }}>
+            📊 Progress Overview
+          </h3>
 
-            <div style={{ marginBottom: '15px' }}>
-              <input
-                type="text"
-                placeholder="Search surahs (name or number)..."
-                value={surahSearch}
-                onChange={(e) => setSurahSearch(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  width: '250px',
-                  border: '1px solid #ddd',
-                  borderRadius: '5px',
-                  marginRight: '10px',
-                }}
-              />
-              <button
-                onClick={() =>
-                  setExpandedSurahs(
-                    new Set(filteredSurahs.map((s) => s.number))
-                  )
-                }
-                style={{
-                  padding: '8px 12px',
-                  backgroundColor: '#4CAF50',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  marginRight: '5px',
-                }}
-              >
-                Expand All
-              </button>
-              <button
-                onClick={() => setExpandedSurahs(new Set())}
-                style={{
-                  padding: '8px 12px',
-                  backgroundColor: '#f44336',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                }}
-              >
-                Collapse All
-              </button>
+          <div style={styles.mobileGrid}>
+            <div style={{
+              ...styles.statCard,
+              backgroundColor: 'var(--danger-color, #ffcdd2)',
+              color: 'white'
+            }}>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                {memorizedPagesList.filter((p) => p.color === 'red').length}
+              </div>
+              <div style={{ fontSize: '0.875rem' }}>🔴 Red Pages</div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>Need more work</div>
             </div>
+
+            <div style={{
+              ...styles.statCard,
+              backgroundColor: 'var(--success-color, #c8e6c9)',
+              color: 'white'
+            }}>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                {memorizedPagesList.filter((p) => p.color === 'green').length}
+              </div>
+              <div style={{ fontSize: '0.875rem' }}>🟢 Green Pages</div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>Well known</div>
+            </div>
+
+            <div style={{
+              ...styles.statCard,
+              backgroundColor: '#1b5e20',
+              color: 'white'
+            }}>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                {memorizedPagesList.filter((p) => p.color === 'super-green').length}
+              </div>
+              <div style={{ fontSize: '0.875rem' }}>🟢🟢 Super Green</div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>Very solid</div>
+            </div>
+
+            <div style={{
+              ...styles.statCard,
+              backgroundColor: 'var(--info-color, #e1f5fe)',
+              color: 'white'
+            }}>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                {memorizedPagesList.length}
+              </div>
+              <div style={{ fontSize: '0.875rem' }}>📖 Total Pages</div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>
+                {Math.round((memorizedPagesList.length / 604) * 100)}% of Quran
+              </div>
+            </div>
+          </div>
+
+          {/* Review History */}
+          <div style={{ marginTop: '2rem' }}>
+            <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>
+              📈 Review History
+            </h4>
+            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              {reviewHistory.length === 0 ? (
+                <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', textAlign: 'center', padding: '2rem' }}>
+                  No review history yet. Complete a review to see your progress!
+                </p>
+              ) : (
+                reviewHistory.map((entry, index) => (
+                  <div key={index} style={{
+                    marginBottom: '1rem',
+                    padding: '1rem',
+                    backgroundColor: 'var(--bg-primary)',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-color)',
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '0.75rem',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem'
+                    }}>
+                      <strong style={{ color: 'var(--text-primary)' }}>{entry.date}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                          Position {entry.position}
+                        </span>
+                        {entry.cycleCompleted && (
+                          <span style={{
+                            fontSize: '0.75rem',
+                            backgroundColor: 'var(--success-color)',
+                            color: 'white',
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '12px',
+                          }}>
+                            🎉 Cycle Complete
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: '0.875rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+                      <strong>Pages reviewed:</strong> {entry.pagesReviewed.map((p) => `P${p.page}`).join(', ')}
+                    </div>
+
+                    <div style={{
+                      fontSize: '0.875rem',
+                      color: 'var(--text-secondary)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem'
+                    }}>
+                      <span>
+                        Difficulty: {entry.pagesReviewed
+                          .map((p) => p.color === 'super-green' ? '🟢🟢' : p.color === 'green' ? '🟢' : '🔴')
+                          .join(' ')}
+                      </span>
+                      <span>Rank: {entry.totalRank}/4</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Page Selector */}
+      {showPageSelector && (
+        <div style={styles.card}>
+          <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', color: 'var(--text-primary)' }}>
+            📝 Select Memorized Pages
+          </h3>
+
+          <input
+            type="text"
+            placeholder="🔍 Search surahs (name or number)..."
+            value={surahSearch}
+            onChange={(e) => setSurahSearch(e.target.value)}
+            style={styles.input}
+          />
+
+          <div style={styles.flexWrap}>
+            <button
+              onClick={() => setExpandedSurahs(new Set(filteredSurahs.map((s) => s.number)))}
+              style={{ ...styles.button, ...styles.primaryButton }}
+            >
+              📖 Expand All
+            </button>
+            <button
+              onClick={() => setExpandedSurahs(new Set())}
+              style={{ ...styles.button, ...styles.dangerButton }}
+            >
+              📕 Collapse All
+            </button>
           </div>
 
           <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
@@ -1159,102 +995,110 @@ ${dataStr}
               const memorizedCount = getSurahMemorizedCount(surah);
               const totalPages = surah.endPage - surah.startPage + 1;
               const isExpanded = expandedSurahs.has(surah.number);
+              const percentage = Math.round((memorizedCount / totalPages) * 100);
 
               return (
-                <div
-                  key={surah.number}
-                  style={{
-                    marginBottom: '10px',
-                    border: '1px solid #e0e0e0',
-                    borderRadius: '5px',
-                  }}
-                >
+                <div key={surah.number} style={{
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  marginBottom: '1rem',
+                  overflow: 'hidden'
+                }}>
                   <div
                     style={{
-                      padding: '12px',
-                      backgroundColor:
-                        memorizedCount > 0 ? '#e8f5e9' : '#fafafa',
+                      padding: '1rem',
+                      backgroundColor: memorizedCount > 0 ? 'var(--bg-accent)' : 'var(--bg-secondary)',
                       cursor: 'pointer',
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem'
                     }}
                     onClick={() => toggleSurah(surah.number)}
                   >
-                    <div>
-                      <strong>
+                    <div style={{ flex: '1', minWidth: '200px' }}>
+                      <strong style={{ color: 'var(--text-primary)' }}>
                         {isExpanded ? '▼' : '▶'} {surah.number}. {surah.name}
                       </strong>
-                      <span
-                        style={{
-                          marginLeft: '10px',
-                          fontSize: '14px',
-                          color: '#666',
-                        }}
-                      >
-                        (Pages {surah.startPage}-{surah.endPage})
-                      </span>
+                      <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                        Pages {surah.startPage}-{surah.endPage}
+                      </div>
                     </div>
-                    <div style={{ fontSize: '14px', color: '#666' }}>
-                      {memorizedCount}/{totalPages} memorized
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+                        {memorizedCount}/{totalPages}
+                      </div>
+                      <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                        {percentage}%
+                      </div>
                     </div>
                   </div>
 
+                  {percentage > 0 && (
+                    <div style={styles.progressBar}>
+                      <div style={{
+                        ...styles.progressFill,
+                        width: `${percentage}%`,
+                        backgroundColor: percentage === 100 ? 'var(--success-color)' : 'var(--info-color)'
+                      }} />
+                    </div>
+                  )}
+
                   {isExpanded && (
-                    <div style={{ padding: '15px', backgroundColor: 'white' }}>
-                      <div
-                        style={{
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          gap: '8px',
-                        }}
-                      >
+                    <div style={{ padding: '1rem', backgroundColor: 'var(--bg-primary)' }}>
+                      <div style={{ 
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                        gap: '0.5rem'
+                      }}>
                         {Array.from(
                           { length: surah.endPage - surah.startPage + 1 },
                           (_, i) => surah.startPage + i
                         ).map((pageNum) => (
-                          <div
-                            key={pageNum}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              padding: '6px 8px',
-                              border: '1px solid #ddd',
-                              borderRadius: '4px',
-                              backgroundColor: memorizedPages[pageNum]
-                                ? '#e8f5e9'
-                                : 'white',
-                              fontSize: '13px',
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={!!memorizedPages[pageNum]}
-                              onChange={() => togglePage(pageNum)}
-                              style={{ marginRight: '6px' }}
-                            />
-                            <span
-                              style={{ marginRight: '8px', minWidth: '45px' }}
-                            >
+                          <div key={pageNum} style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            padding: '0.75rem',
+                            border: '2px solid var(--border-color)',
+                            borderRadius: '8px',
+                            backgroundColor: memorizedPages[pageNum] ? 'var(--bg-accent)' : 'var(--bg-secondary)',
+                            minHeight: '80px',
+                            justifyContent: 'center',
+                            gap: '0.5rem'
+                          }}>
+                            <label style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '0.5rem',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                              fontWeight: '500',
+                              color: 'var(--text-primary)'
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={!!memorizedPages[pageNum]}
+                                onChange={() => togglePage(pageNum)}
+                                style={{ transform: 'scale(1.2)' }}
+                              />
                               P{pageNum}
-                            </span>
+                            </label>
                             {memorizedPages[pageNum] && (
                               <select
                                 value={memorizedPages[pageNum]}
-                                onChange={(e) =>
-                                  changePageColor(pageNum, e.target.value)
-                                }
+                                onChange={(e) => changePageColor(pageNum, e.target.value)}
                                 style={{
-                                  padding: '2px 4px',
-                                  borderRadius: '3px',
-                                  fontSize: '11px',
-                                  border: '1px solid #ccc',
+                                  ...styles.select,
                                   ...getColorStyle(memorizedPages[pageNum]),
+                                  width: '100%',
+                                  textAlign: 'center'
                                 }}
                               >
-                                <option value="red">🔴</option>
-                                <option value="green">🟢</option>
-                                <option value="super-green">🟢🟢</option>
+                                <option value="red">🔴 Red</option>
+                                <option value="green">🟢 Green</option>
+                                <option value="super-green">🟢🟢 Super</option>
                               </select>
                             )}
                           </div>
@@ -1266,140 +1110,180 @@ ${dataStr}
               );
             })}
           </div>
-
-          <h4>Review History</h4>
-          <div
-            style={{ maxHeight: '300px', overflowY: 'auto', marginTop: '15px' }}
-          >
-            {reviewHistory.length === 0 ? (
-              <p style={{ color: '#666', fontStyle: 'italic' }}>
-                No review history yet. Complete a review to see your progress!
-              </p>
-            ) : (
-              reviewHistory.map((entry, index) => (
-                <div
-                  key={index}
-                  style={{
-                    marginBottom: '10px',
-                    padding: '12px',
-                    backgroundColor: 'white',
-                    borderRadius: '6px',
-                    border: '1px solid #e0e0e0',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '8px',
-                    }}
-                  >
-                    <strong style={{ color: '#333' }}>{entry.date}</strong>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                      }}
-                    >
-                      <span style={{ fontSize: '12px', color: '#666' }}>
-                        Position {entry.position}
-                      </span>
-                      {entry.cycleCompleted && (
-                        <span
-                          style={{
-                            fontSize: '12px',
-                            backgroundColor: '#4CAF50',
-                            color: 'white',
-                            padding: '2px 6px',
-                            borderRadius: '10px',
-                          }}
-                        >
-                          🎉 Cycle Complete
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div style={{ fontSize: '13px', marginBottom: '5px' }}>
-                    <strong>Pages reviewed:</strong>{' '}
-                    {entry.pagesReviewed.map((p) => `P${p.page}`).join(', ')}
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize: '12px',
-                      color: '#666',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span>
-                      Difficulty:{' '}
-                      {entry.pagesReviewed
-                        .map((p) =>
-                          p.color === 'super-green'
-                            ? '🟢🟢'
-                            : p.color === 'green'
-                            ? '🟢'
-                            : '🔴'
-                        )
-                        .join(' ')}
-                    </span>
-                    <span>Total Rank: {entry.totalRank}/4</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
         </div>
       )}
 
-      <div style={{ marginTop: '20px', fontSize: '14px', color: '#666' }}>
-        <strong>Statistics:</strong>
-        <br />
-        Total memorized: {memorizedPagesList.length} pages
-        <br />
-        🔴 Red: {memorizedPagesList.filter((p) => p.color === 'red').length} |
-        🟢 Green: {memorizedPagesList.filter((p) => p.color === 'green').length}{' '}
-        | 🟢🟢 Super:{' '}
-        {memorizedPagesList.filter((p) => p.color === 'super-green').length}
+      {/* Statistics */}
+      <div style={styles.card}>
+        <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>
+          📊 Statistics
+        </h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', fontSize: '0.875rem' }}>
+          <div style={{ textAlign: 'center', padding: '0.75rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+              {memorizedPagesList.length}
+            </div>
+            <div style={{ color: 'var(--text-secondary)' }}>Total Pages</div>
+          </div>
+          <div style={{ textAlign: 'center', padding: '0.75rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--danger-color)' }}>
+              {memorizedPagesList.filter((p) => p.color === 'red').length}
+            </div>
+            <div style={{ color: 'var(--text-secondary)' }}>🔴 Red</div>
+          </div>
+          <div style={{ textAlign: 'center', padding: '0.75rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--success-color)' }}>
+              {memorizedPagesList.filter((p) => p.color === 'green').length}
+            </div>
+            <div style={{ color: 'var(--text-secondary)' }}>🟢 Green</div>
+          </div>
+          <div style={{ textAlign: 'center', padding: '0.75rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1b5e20' }}>
+              {memorizedPagesList.filter((p) => p.color === 'super-green').length}
+            </div>
+            <div style={{ color: 'var(--text-secondary)' }}>🟢🟢 Super</div>
+          </div>
+        </div>
+
+        {/* Detailed Surah Progress */}
+        {showOverview && (
+          <div style={{ marginTop: '2rem' }}>
+            <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>
+              📋 Memorized Surahs Progress
+            </h4>
+            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              {getOverviewData().map((surah) => (
+                <div key={surah.number} style={{
+                  marginBottom: '1rem',
+                  padding: '1rem',
+                  backgroundColor: 'var(--bg-primary)',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '0.75rem',
+                    flexWrap: 'wrap',
+                    gap: '0.5rem'
+                  }}>
+                    <div style={{ flex: '1', minWidth: '150px' }}>
+                      <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>
+                        {surah.number}. {surah.name}
+                      </strong>
+                      <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                        Pages {surah.startPage}-{surah.endPage}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{
+                        fontSize: '1.1rem',
+                        fontWeight: 'bold',
+                        color: surah.percentage === 100 ? 'var(--success-color)' : 'var(--text-primary)'
+                      }}>
+                        {surah.memorizedCount}/{surah.totalPages}
+                      </div>
+                      <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                        ({surah.percentage}%)
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={styles.progressBar}>
+                    <div style={{
+                      ...styles.progressFill,
+                      width: `${surah.percentage}%`,
+                      backgroundColor: surah.percentage === 100 ? 'var(--success-color)' : 'var(--info-color)'
+                    }} />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '1rem', fontSize: '0.875rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ color: 'var(--danger-color)' }}>🔴 {surah.colors.red}</span>
+                    <span style={{ color: 'var(--success-color)' }}>🟢 {surah.colors.green}</span>
+                    <span style={{ color: '#1b5e20' }}>🟢🟢 {surah.colors['super-green']}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      <div
-        style={{
-          marginTop: '30px',
-          paddingTop: '20px',
-          borderTop: '1px solid #ddd',
-        }}
-      >
-        <button
-          style={{
-            padding: '8px 16px',
-            fontSize: '14px',
-            backgroundColor: '#f44336',
+      {/* Data Management Section */}
+      <div style={styles.card}>
+        <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', textAlign: 'center', color: 'var(--text-primary)' }}>
+          💾 Data Management
+        </h3>
+
+        <div style={styles.flexWrap}>
+          <button
+            style={{ ...styles.button, ...styles.primaryButton }}
+            onClick={exportData}
+          >
+            📥 Export
+          </button>
+
+          <button
+            style={{ ...styles.button, ...styles.secondaryButton }}
+            onClick={emailData}
+          >
+            📧 Email
+          </button>
+
+          <button
+            style={{ ...styles.button, backgroundColor: '#9C27B0', color: 'white' }}
+            onClick={copyToClipboard}
+          >
+            📋 Copy
+          </button>
+
+          <label style={{ ...styles.button, ...styles.warningButton, textAlign: 'center' }}>
+            📤 Import
+            <input
+              type="file"
+              accept=".json"
+              onChange={importData}
+              style={{ display: 'none' }}
+            />
+          </label>
+        </div>
+
+        {importError && (
+          <div style={{
+            padding: '1rem',
+            backgroundColor: 'var(--danger-color)',
             color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-          }}
+            borderRadius: '8px',
+            fontSize: '0.875rem',
+            marginBottom: '1rem',
+            textAlign: 'center'
+          }}>
+            ❌ {importError}
+          </div>
+        )}
+
+        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
+          <strong>Export:</strong> Download backup • <strong>Email:</strong> Open in email app •{' '}
+          <strong>Copy:</strong> Copy to clipboard • <strong>Import:</strong> Restore from backup
+        </div>
+      </div>
+
+      {/* Reset Button */}
+      <div style={{ textAlign: 'center', marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid var(--border-color)' }}>
+        <button
+          style={{ ...styles.button, ...styles.dangerButton }}
           onClick={() => {
-            if (
-              window.confirm(
-                'This will reset your review position to the beginning. Continue?'
-              )
-            ) {
+            if (window.confirm('Reset your review position to the beginning?')) {
               setCurrentPosition(0);
               setLastReviewDate(null);
             }
           }}
         >
-          Reset Review Position
+          🔄 Reset Position
         </button>
-
-        <p style={{ fontSize: '12px', color: '#999', marginTop: '10px' }}>
-          Your data is automatically saved in your browser
+        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '1rem' }}>
+          Your data is saved automatically
         </p>
       </div>
     </div>
