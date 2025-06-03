@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import { useQuranTracker } from './useQuranTracker.js';
 import { surahInfo, getRank } from './quranData.js';
+import { useStorage } from './useStorage.js';
 import { setupTheme, styles, getColorStyle } from './styles.js';
 
 export default function App() {
@@ -65,6 +66,8 @@ export default function App() {
     switchToLocal,
     resolveDataConflict,
   } = useQuranTracker();
+
+  const { migrateToCloud } = useStorage(user);
 
   // Setup theme on mount
   useEffect(() => {
@@ -178,32 +181,27 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {!isCloudSync && (
-              <button
-                style={{
-                  ...styles.button,
-                  ...styles.secondaryButton,
-                  minWidth: 'auto',
-                  padding: '8px 16px',
-                  fontSize: '14px'
-                }}
-                onClick={async () => {
-                  try {
-                    const { migrateToCloud } = await import('./useStorage.js');
-                    await migrateToCloud({
-                      memorizedPages,
-                      currentPosition,
-                      lastReviewDate,
-                      reviewHistory
-                    });
-                  } catch (error) {
-                    console.error('Migration failed:', error);
-                  }
-                }}
-              >
-                ☁️ Enable Sync
-              </button>
-            )}
+          {!isCloudSync && (
+            <button
+              style={{
+                ...styles.button,
+                ...styles.secondaryButton,
+                minWidth: 'auto',
+                padding: '8px 16px',
+                fontSize: '14px'
+              }}
+              onClick={async () => {
+                await migrateToCloud({
+                  memorizedPages,
+                  currentPosition,
+                  lastReviewDate,
+                  reviewHistory
+                });
+              }}
+            >
+              ☁️ Enable Sync
+            </button>
+          )}
             <button
               style={{
                 ...styles.button,
