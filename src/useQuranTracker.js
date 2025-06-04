@@ -13,7 +13,7 @@ import {
 } from './quranData.js';
 import { useAuth } from './useAuth.js';
 import { useStorage } from './useStorage.js';
-import { medalHelpers } from './useOnboarding.js';
+import { medalHelpers } from './useOnboarding';
 
 export const useQuranTracker = () => {
   // Authentication

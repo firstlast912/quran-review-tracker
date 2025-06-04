@@ -1,6 +1,6 @@
 // OnboardingFlow.jsx - Complete onboarding experience
 import { useState } from 'react';
-import { surahInfo } from './quranData.js';
+import { surahInfo } from './quranData';
 
 export const OnboardingFlow = ({ onComplete }) => {
   const [step, setStep] = useState('welcome'); // welcome, education, selection, complete

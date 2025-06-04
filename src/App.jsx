@@ -5,7 +5,7 @@ import { surahInfo, getRank } from './quranData.js';
 import { useStorage } from './useStorage.js';
 import { setupTheme, styles, getColorStyle } from './styles.js';
 import { useOnboarding } from './useOnboarding.js';
-import { OnboardingFlow } from './OnboardingFlow.jsx';
+import { OnboardingFlow } from './OnboardingFlow';
 import { 
   TodaysReviewEnhanced, 
   QualityUpgradeModal, 
@@ -14,7 +14,8 @@ import {
   CycleComplete, 
   InstallPrompt,
   MedalBadge 
-} from './EnhancedComponents.jsx';
+} from './EnhancedComponents';
+import { useOnboarding } from './useOnboarding';
 
 export default function App() {
   // Get everything from the custom hook (now includes Firebase and onboarding)

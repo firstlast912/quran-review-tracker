@@ -1,6 +1,6 @@
 // EnhancedComponents.jsx - All enhanced UI components with medal system
 import { useState } from 'react';
-import { getRank, surahInfo } from './quranData.js';
+import { getRank, surahInfo } from './quranData';
 
 // Medal Badge Component
 export const MedalBadge = ({ quality, size = 'normal', showLabel = true }) => {

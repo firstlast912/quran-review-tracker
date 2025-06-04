@@ -2,41 +2,40 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+  <link rel="icon" href="/favicon.ico" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#2196f3" />
   <meta name="description" content="Track your Quran memorization progress with spaced repetition and quality levels. Perfect for those aiming to memorize the entire Quran." />
   
   <!-- PWA Manifest -->
-  <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+  <link rel="manifest" href="/manifest.json" />
   
   <!-- Apple Touch Icon and PWA Support -->
-  <link rel="apple-touch-icon" href="%PUBLIC_URL%/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Quran Tracker" />
   
   <!-- Apple Splash Screens -->
-  <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/icon-512.png" />
+  <link rel="apple-touch-startup-image" href="/icon-512.png" />
   
   <!-- Microsoft Tiles -->
   <meta name="msapplication-TileColor" content="#2196f3" />
-  <meta name="msapplication-TileImage" content="%PUBLIC_URL%/icon-144.png" />
-  <meta name="msapplication-config" content="%PUBLIC_URL%/browserconfig.xml" />
+  <meta name="msapplication-TileImage" content="/icon-144.png" />
   
   <!-- Additional PWA Meta Tags -->
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="application-name" content="Quran Tracker" />
   
   <!-- Icons for different sizes -->
-  <link rel="icon" type="image/png" sizes="32x32" href="%PUBLIC_URL%/icon-32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="%PUBLIC_URL%/icon-16.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/icon-16.png" />
   
   <!-- Open Graph Meta Tags for sharing -->
   <meta property="og:title" content="Quran Memorization Tracker" />
   <meta property="og:description" content="Track your Quran memorization progress with spaced repetition and quality levels. Perfect for those aiming to memorize the entire Quran." />
-  <meta property="og:image" content="%PUBLIC_URL%/icon-512.png" />
-  <meta property="og:url" content="https://quran-tracker.app" />
+  <meta property="og:image" content="/icon-512.png" />
+  <meta property="og:url" content="https://quran-review-tracker.vercel.app" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Quran Memorization Tracker" />
   
@@ -44,7 +43,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Quran Memorization Tracker" />
   <meta name="twitter:description" content="Track your Quran memorization progress with spaced repetition and quality levels." />
-  <meta name="twitter:image" content="%PUBLIC_URL%/icon-512.png" />
+  <meta name="twitter:image" content="/icon-512.png" />
   
   <!-- Additional SEO Meta Tags -->
   <meta name="keywords" content="Quran, memorization, Hifz, spaced repetition, Islamic, Muslim, review, tracker" />
@@ -183,23 +182,34 @@
       }, 1000);
     });
 
-    // Service Worker Registration
+    // Service Worker Registration - Only if sw.js exists
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
+        // Check if sw.js exists before registering
+        fetch('/sw.js', { method: 'HEAD' })
+          .then(response => {
+            if (response.ok) {
+              return navigator.serviceWorker.register('/sw.js');
+            } else {
+              console.log('Service worker not found, skipping registration');
+              return null;
+            }
+          })
           .then((registration) => {
-            console.log('SW registered: ', registration.scope);
-            
-            // Check for updates
-            registration.addEventListener('updatefound', () => {
-              const newWorker = registration.installing;
-              newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  // New content is available, show update notification
-                  showUpdateNotification();
-                }
+            if (registration) {
+              console.log('SW registered: ', registration.scope);
+              
+              // Check for updates
+              registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    // New content is available, show update notification
+                    showUpdateNotification();
+                  }
+                });
               });
-            });
+            }
           })
           .catch((registrationError) => {
             console.log('SW registration failed: ', registrationError);
@@ -419,26 +429,6 @@
     window.addEventListener('orientationchange', handleViewportChange);
     window.addEventListener('resize', handleViewportChange);
 
-    // Preload critical resources
-    function preloadResources() {
-      // Preload the app's main JavaScript bundle
-      const link = document.createElement('link');
-      link.rel = 'preload';
-      link.as = 'script';
-      link.href = '/static/js/bundle.js';
-      document.head.appendChild(link);
-      
-      // Preload critical CSS
-      const cssLink = document.createElement('link');
-      cssLink.rel = 'preload';
-      cssLink.as = 'style';
-      cssLink.href = '/static/css/main.css';
-      document.head.appendChild(cssLink);
-    }
-
-    // Call preload function
-    preloadResources();
-
     // Handle share target (if app was opened via sharing)
     const urlParams = new URLSearchParams(window.location.search);
     const sharedData = urlParams.get('shared');
@@ -513,7 +503,7 @@
     "@type": "WebApplication",
     "name": "Quran Memorization Tracker",
     "description": "Track your Quran memorization progress with spaced repetition and quality levels. Perfect for those aiming to memorize the entire Quran.",
-    "url": "https://quran-tracker.app",
+    "url": "https://quran-review-tracker.vercel.app",
     "applicationCategory": "EducationalApplication",
     "operatingSystem": "Any",
     "offers": {
@@ -525,7 +515,7 @@
       "@type": "Organization",
       "name": "Quran Memorization Tracker"
     },
-    "screenshot": "https://quran-tracker.app/icon-512.png",
+    "screenshot": "https://quran-review-tracker.vercel.app/icon-512.png",
     "softwareVersion": "2.0",
     "aggregateRating": {
       "@type": "AggregateRating",
@@ -534,19 +524,5 @@
     }
   }
   </script>
-  
-  <!-- Browser Configuration XML for Microsoft -->
-  <!--
-  Create browserconfig.xml in public folder:
-  <?xml version="1.0" encoding="utf-8"?>
-  <browserconfig>
-    <msapplication>
-      <tile>
-        <square150x150logo src="/icon-144.png"/>
-        <TileColor>#2196f3</TileColor>
-      </tile>
-    </msapplication>
-  </browserconfig>
-  -->
 </body>
 </html>
