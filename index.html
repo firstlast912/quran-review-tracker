@@ -2,40 +2,40 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+  <link rel="icon" href="/favicon.ico" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#2196f3" />
   <meta name="description" content="Track your Quran memorization progress with spaced repetition and quality levels. Perfect for those aiming to memorize the entire Quran." />
   
   <!-- PWA Manifest -->
-  <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+  <link rel="manifest" href="/manifest.json" />
   
   <!-- Apple Touch Icon and PWA Support -->
-  <link rel="apple-touch-icon" href="%PUBLIC_URL%/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Quran Tracker" />
   
   <!-- Apple Splash Screens -->
-  <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/icon-512.png" />
+  <link rel="apple-touch-startup-image" href="/icon-512.png" />
   
   <!-- Microsoft Tiles -->
   <meta name="msapplication-TileColor" content="#2196f3" />
-  <meta name="msapplication-TileImage" content="%PUBLIC_URL%/icon-144.png" />
-  <meta name="msapplication-config" content="%PUBLIC_URL%/browserconfig.xml" />
+  <meta name="msapplication-TileImage" content="/icon-144.png" />
+  <meta name="msapplication-config" content="/browserconfig.xml" />
   
   <!-- Additional PWA Meta Tags -->
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="application-name" content="Quran Tracker" />
   
   <!-- Icons for different sizes -->
-  <link rel="icon" type="image/png" sizes="32x32" href="%PUBLIC_URL%/icon-32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="%PUBLIC_URL%/icon-16.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/icon-16.png" />
   
   <!-- Open Graph Meta Tags for sharing -->
   <meta property="og:title" content="Quran Memorization Tracker" />
   <meta property="og:description" content="Track your Quran memorization progress with spaced repetition and quality levels. Perfect for those aiming to memorize the entire Quran." />
-  <meta property="og:image" content="%PUBLIC_URL%/icon-512.png" />
+  <meta property="og:image" content="/icon-512.png" />
   <meta property="og:url" content="https://quran-tracker.app" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Quran Memorization Tracker" />
@@ -44,7 +44,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Quran Memorization Tracker" />
   <meta name="twitter:description" content="Track your Quran memorization progress with spaced repetition and quality levels." />
-  <meta name="twitter:image" content="%PUBLIC_URL%/icon-512.png" />
+  <meta name="twitter:image" content="/icon-512.png" />
   
   <!-- Additional SEO Meta Tags -->
   <meta name="keywords" content="Quran, memorization, Hifz, spaced repetition, Islamic, Muslim, review, tracker" />
@@ -189,17 +189,6 @@
         navigator.serviceWorker.register('/sw.js')
           .then((registration) => {
             console.log('SW registered: ', registration.scope);
-            
-            // Check for updates
-            registration.addEventListener('updatefound', () => {
-              const newWorker = registration.installing;
-              newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  // New content is available, show update notification
-                  showUpdateNotification();
-                }
-              });
-            });
           })
           .catch((registrationError) => {
             console.log('SW registration failed: ', registrationError);
@@ -212,139 +201,41 @@
     let installPromptShown = false;
 
     window.addEventListener('beforeinstallprompt', (e) => {
-      // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
-      // Stash the event so it can be triggered later
       deferredPrompt = e;
       
-      // Show custom install prompt after user interaction
       if (!installPromptShown && !isAppInstalled()) {
-        setTimeout(showInstallPrompt, 3000); // Show after 3 seconds
+        setTimeout(showInstallPrompt, 3000);
       }
     });
 
-    // Check if app is already installed
     function isAppInstalled() {
       return window.matchMedia('(display-mode: standalone)').matches ||
              window.navigator.standalone ||
              document.referrer.includes('android-app://');
     }
 
-    // Show custom install prompt
     function showInstallPrompt() {
-      // Check if user has dismissed prompt recently
       const lastDismissed = localStorage.getItem('installPromptDismissed');
       if (lastDismissed && Date.now() - parseInt(lastDismissed) < 7 * 24 * 60 * 60 * 1000) {
-        return; // Don't show for 7 days after dismissal
+        return;
       }
 
       installPromptShown = true;
-      
-      // This will be handled by the React app's InstallPrompt component
       window.dispatchEvent(new CustomEvent('showInstallPrompt', {
         detail: { deferredPrompt }
       }));
     }
 
-    // Handle app installed
     window.addEventListener('appinstalled', (evt) => {
       console.log('App was installed successfully');
-      // Track installation analytics here if needed
     });
 
-    // Show update notification
-    function showUpdateNotification() {
-      // Create a simple update notification
-      const notification = document.createElement('div');
-      notification.innerHTML = `
-        <div style="
-          position: fixed;
-          top: 20px;
-          right: 20px;
-          background: #2196f3;
-          color: white;
-          padding: 1rem 1.5rem;
-          border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-          z-index: 10000;
-          max-width: 300px;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        ">
-          <div style="font-weight: bold; margin-bottom: 0.5rem;">
-            📖 Update Available
-          </div>
-          <div style="font-size: 0.9rem; margin-bottom: 1rem;">
-            A new version of Quran Tracker is available
-          </div>
-          <div style="display: flex; gap: 0.5rem;">
-            <button onclick="updateApp()" style="
-              background: white;
-              color: #2196f3;
-              border: none;
-              padding: 0.5rem 1rem;
-              border-radius: 4px;
-              cursor: pointer;
-              font-weight: bold;
-              font-size: 0.9rem;
-            ">
-              Update
-            </button>
-            <button onclick="this.parentElement.parentElement.parentElement.remove()" style="
-              background: transparent;
-              color: white;
-              border: 1px solid white;
-              padding: 0.5rem 1rem;
-              border-radius: 4px;
-              cursor: pointer;
-              font-size: 0.9rem;
-            ">
-              Later
-            </button>
-          </div>
-        </div>
-      `;
-      
-      document.body.appendChild(notification);
-      
-      // Auto-remove after 10 seconds
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.remove();
-        }
-      }, 10000);
-    }
-
-    // Update app function
-    function updateApp() {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.ready.then((registration) => {
-          if (registration.waiting) {
-            // Tell the waiting service worker to skip waiting and become active
-            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-            
-            // Reload the page to get the new version
-            window.location.reload();
-          }
-        });
-      }
-    }
-
-    // Handle service worker messages
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'SW_UPDATED') {
-          showUpdateNotification();
-        }
-      });
-    }
-
-    // Network status monitoring
     function updateNetworkStatus() {
       const isOnline = navigator.onLine;
       const statusElement = document.getElementById('network-status');
       
       if (!isOnline && !statusElement) {
-        // Show offline indicator
         const offlineIndicator = document.createElement('div');
         offlineIndicator.id = 'network-status';
         offlineIndicator.innerHTML = `
@@ -366,142 +257,13 @@
         `;
         document.body.appendChild(offlineIndicator);
       } else if (isOnline && statusElement) {
-        // Remove offline indicator
         statusElement.remove();
       }
     }
 
-    // Monitor network status
     window.addEventListener('online', updateNetworkStatus);
     window.addEventListener('offline', updateNetworkStatus);
-    
-    // Initial network status check
     updateNetworkStatus();
-
-    // Performance monitoring
-    window.addEventListener('load', () => {
-      // Log performance metrics (optional, for debugging)
-      if ('performance' in window) {
-        const perfData = performance.getEntriesByType('navigation')[0];
-        console.log('App loading performance:', {
-          domContentLoaded: perfData.domContentLoadedEventEnd - perfData.domContentLoadedEventStart,
-          loadComplete: perfData.loadEventEnd - perfData.loadEventStart,
-          totalTime: perfData.loadEventEnd - perfData.navigationStart
-        });
-      }
-    });
-
-    // Error handling
-    window.addEventListener('error', (event) => {
-      console.error('Global error:', event.error);
-      // Could send error reports to analytics service here
-    });
-
-    window.addEventListener('unhandledrejection', (event) => {
-      console.error('Unhandled promise rejection:', event.reason);
-      // Could send error reports to analytics service here
-    });
-
-    // Prevent zoom on iOS Safari
-    document.addEventListener('gesturestart', function (e) {
-      e.preventDefault();
-    });
-
-    // Handle viewport changes on mobile
-    function handleViewportChange() {
-      const viewport = document.querySelector('meta[name=viewport]');
-      if (viewport) {
-        viewport.setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover');
-      }
-    }
-
-    // iOS Safari viewport fix
-    window.addEventListener('orientationchange', handleViewportChange);
-    window.addEventListener('resize', handleViewportChange);
-
-    // Preload critical resources
-    function preloadResources() {
-      // Preload the app's main JavaScript bundle
-      const link = document.createElement('link');
-      link.rel = 'preload';
-      link.as = 'script';
-      link.href = '/static/js/bundle.js';
-      document.head.appendChild(link);
-      
-      // Preload critical CSS
-      const cssLink = document.createElement('link');
-      cssLink.rel = 'preload';
-      cssLink.as = 'style';
-      cssLink.href = '/static/css/main.css';
-      document.head.appendChild(cssLink);
-    }
-
-    // Call preload function
-    preloadResources();
-
-    // Handle share target (if app was opened via sharing)
-    const urlParams = new URLSearchParams(window.location.search);
-    const sharedData = urlParams.get('shared');
-    if (sharedData) {
-      try {
-        const data = JSON.parse(decodeURIComponent(sharedData));
-        // Store shared data for the React app to pick up
-        sessionStorage.setItem('sharedData', JSON.stringify(data));
-        
-        // Clean up URL
-        const url = new URL(window.location);
-        url.searchParams.delete('shared');
-        window.history.replaceState({}, document.title, url.pathname);
-      } catch (e) {
-        console.error('Error processing shared data:', e);
-      }
-    }
-
-    // Handle deep linking
-    function handleDeepLink() {
-      const path = window.location.pathname;
-      const params = new URLSearchParams(window.location.search);
-      const action = params.get('action');
-      
-      if (action) {
-        // Store the requested action for the React app
-        sessionStorage.setItem('requestedAction', action);
-        
-        // Clean up URL
-        const url = new URL(window.location);
-        url.searchParams.delete('action');
-        window.history.replaceState({}, document.title, url.pathname);
-      }
-    }
-
-    // Handle deep links on load
-    handleDeepLink();
-
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (event) => {
-      // Only handle shortcuts when not in input fields
-      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
-        return;
-      }
-
-      // Ctrl/Cmd + R: Start review
-      if ((event.ctrlKey || event.metaKey) && event.key === 'r') {
-        event.preventDefault();
-        window.dispatchEvent(new CustomEvent('startReview'));
-      }
-      
-      // Ctrl/Cmd + A: Add pages
-      if ((event.ctrlKey || event.metaKey) && event.key === 'a') {
-        event.preventDefault();
-        window.dispatchEvent(new CustomEvent('addPages'));
-      }
-      
-      // Ctrl/Cmd + P: Show progress
-      if ((event.ctrlKey || event.metaKey) && event.key === 'p') {
-        event.preventDefault();
-        window.dispatchEvent(new CustomEvent('showProgress'));
-      }
-    });
 
     console.log('🕌 Quran Memorization Tracker - PWA initialized');
   </script>
@@ -525,7 +287,7 @@
       "@type": "Organization",
       "name": "Quran Memorization Tracker"
     },
-    "screenshot": "https://quran-tracker.app/icon-512.png",
+    "screenshot": "/icon-512.png",
     "softwareVersion": "2.0",
     "aggregateRating": {
       "@type": "AggregateRating",
@@ -534,19 +296,5 @@
     }
   }
   </script>
-  
-  <!-- Browser Configuration XML for Microsoft -->
-  <!--
-  Create browserconfig.xml in public folder:
-  <?xml version="1.0" encoding="utf-8"?>
-  <browserconfig>
-    <msapplication>
-      <tile>
-        <square150x150logo src="/icon-144.png"/>
-        <TileColor>#2196f3</TileColor>
-      </tile>
-    </msapplication>
-  </browserconfig>
-  -->
 </body>
 </html>

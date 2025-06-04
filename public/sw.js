@@ -1,12 +1,11 @@
-// sw.js - Service Worker for Quran Memorization Tracker PWA
+// sw.js - Service Worker for Quran Memorization Tracker PWA (Vite version)
 const CACHE_NAME = 'quran-tracker-v2.0';
 const CACHE_URLS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
-  // Add other static assets as needed
+  // Remove the static paths that don't exist in Vite builds
+  // Vite generates unique filenames, so we'll cache them dynamically
 ];
 
 // Font and external resources
@@ -92,13 +91,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // Handle app requests with cache-first strategy for static assets
-  if (url.pathname.includes('/static/') || 
+  // Handle Vite build assets (they have unique hashes)
+  if (url.pathname.startsWith('/assets/') || 
       url.pathname.endsWith('.js') || 
       url.pathname.endsWith('.css') ||
       url.pathname.endsWith('.png') ||
       url.pathname.endsWith('.jpg') ||
-      url.pathname.endsWith('.svg')) {
+      url.pathname.endsWith('.svg') ||
+      url.pathname.endsWith('.ico')) {
     
     event.respondWith(
       caches.match(request)
@@ -328,63 +328,6 @@ self.addEventListener('message', (event) => {
         .catch((error) => {
           event.ports[0].postMessage({ success: false, error: error.message });
         })
-    );
-  }
-});
-
-// Periodic background sync (for browsers that support it)
-self.addEventListener('periodicsync', (event) => {
-  console.log('Service Worker: Periodic sync triggered:', event.tag);
-  
-  if (event.tag === 'daily-review-reminder') {
-    event.waitUntil(checkDailyReviewStatus());
-  }
-});
-
-async function checkDailyReviewStatus() {
-  try {
-    // Check if user has completed today's review
-    const today = new Date().toDateString();
-    const lastReviewDate = await getLastReviewDate();
-    
-    if (lastReviewDate !== today) {
-      // Show reminder notification
-      await self.registration.showNotification('Daily Review Reminder', {
-        body: "Don't forget your daily Quran review!",
-        icon: '/icon-192.png',
-        badge: '/icon-72.png',
-        tag: 'daily-reminder',
-        requireInteraction: false,
-        silent: false
-      });
-    }
-  } catch (error) {
-    console.error('Service Worker: Error checking daily review status:', error);
-  }
-}
-
-async function getLastReviewDate() {
-  // This would integrate with your app's storage to check last review date
-  // For now, return null to avoid errors
-  return null;
-}
-
-// Handle share target (when users share to the app)
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-  
-  if (url.pathname === '/share' && event.request.method === 'GET') {
-    event.respondWith(
-      (async () => {
-        const data = {
-          title: url.searchParams.get('title') || '',
-          text: url.searchParams.get('text') || '',
-          url: url.searchParams.get('url') || ''
-        };
-        
-        // Redirect to main app with shared data
-        return Response.redirect(`/?shared=${encodeURIComponent(JSON.stringify(data))}`, 302);
-      })()
     );
   }
 });
