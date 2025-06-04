@@ -1,17 +1,9 @@
-// sw.js - Service Worker for Quran Memorization Tracker PWA (Vite version)
-const CACHE_NAME = 'quran-tracker-v2.0';
-const CACHE_URLS = [
+// sw.js - Service Worker for Quran Memorization Tracker PWA
+const CACHE_NAME = 'quran-tracker-v2.1';
+const urlsToCache = [
   '/',
   '/index.html',
-  '/manifest.json',
-  // Remove the static paths that don't exist in Vite builds
-  // Vite generates unique filenames, so we'll cache them dynamically
-];
-
-// Font and external resources
-const EXTERNAL_CACHE_URLS = [
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
-  'https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2'
+  '/manifest.json'
 ];
 
 // Install event - cache essential files
@@ -22,11 +14,11 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('Service Worker: Caching app shell');
-        return cache.addAll(CACHE_URLS);
+        return cache.addAll(urlsToCache);
       })
       .then(() => {
         console.log('Service Worker: App shell cached');
-        return self.skipWaiting(); // Activate immediately
+        return self.skipWaiting();
       })
       .catch((error) => {
         console.error('Service Worker: Cache failed', error);
@@ -43,7 +35,7 @@ self.addEventListener('activate', (event) => {
       .then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
-            if (cacheName !== CACHE_NAME) {
+            if (cacheName !== CACHE_NAME && cacheName.startsWith('quran-tracker')) {
               console.log('Service Worker: Deleting old cache:', cacheName);
               return caches.delete(cacheName);
             }
@@ -52,12 +44,12 @@ self.addEventListener('activate', (event) => {
       })
       .then(() => {
         console.log('Service Worker: Claiming clients');
-        return self.clients.claim(); // Take control immediately
+        return self.clients.claim();
       })
   );
 });
 
-// Fetch event - serve from cache when offline, update cache when online
+// Fetch event - network first, fallback to cache
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -67,71 +59,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // Skip Firebase and external API requests (handle separately)
-  if (url.origin.includes('firebase') || 
-      url.origin.includes('googleapis') ||
-      url.origin.includes('gstatic')) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // Cache successful external requests
-          if (response.status === 200) {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseClone);
-            });
-          }
-          return response;
-        })
-        .catch(() => {
-          // Return cached version if available
-          return caches.match(request);
-        })
-    );
+  // Skip cross-origin requests
+  if (url.origin !== location.origin) {
     return;
   }
   
-  // Handle Vite build assets (they have unique hashes)
-  if (url.pathname.startsWith('/assets/') || 
-      url.pathname.endsWith('.js') || 
-      url.pathname.endsWith('.css') ||
-      url.pathname.endsWith('.png') ||
-      url.pathname.endsWith('.jpg') ||
-      url.pathname.endsWith('.svg') ||
-      url.pathname.endsWith('.ico')) {
-    
-    event.respondWith(
-      caches.match(request)
-        .then((cachedResponse) => {
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-          
-          return fetch(request)
-            .then((response) => {
-              if (response.status === 200) {
-                const responseClone = response.clone();
-                caches.open(CACHE_NAME).then((cache) => {
-                  cache.put(request, responseClone);
-                });
-              }
-              return response;
-            });
-        })
-        .catch(() => {
-          console.log('Service Worker: Failed to fetch and no cache available for:', request.url);
-        })
-    );
-    return;
-  }
-  
-  // Handle navigation requests with network-first strategy
+  // Handle app navigation (return index.html for all navigation requests)
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Cache successful navigation responses
-          if (response.status === 200) {
+          // Cache successful responses
+          if (response && response.status === 200) {
             const responseClone = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(request, responseClone);
@@ -140,195 +79,41 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          // Fallback to cached version or index.html
-          return caches.match(request)
-            .then((cachedResponse) => {
-              if (cachedResponse) {
-                return cachedResponse;
-              }
-              return caches.match('/index.html');
-            });
+          // Fallback to cached index.html
+          return caches.match('/index.html');
         })
     );
     return;
   }
   
-  // Default: try network first, fallback to cache
+  // For all other requests, try network first, then cache
   event.respondWith(
     fetch(request)
       .then((response) => {
-        if (response.status === 200) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseClone);
-          });
+        // Don't cache failed responses
+        if (!response || response.status !== 200) {
+          return response;
         }
+        
+        // Cache successful responses
+        const responseClone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(request, responseClone);
+        });
+        
         return response;
       })
       .catch(() => {
+        // Fallback to cache
         return caches.match(request);
       })
   );
 });
 
-// Background sync for offline data synchronization
-self.addEventListener('sync', (event) => {
-  console.log('Service Worker: Background sync triggered:', event.tag);
-  
-  if (event.tag === 'background-sync-quran-data') {
-    event.waitUntil(syncQuranData());
-  }
-});
-
-// Handle background sync for Quran data
-async function syncQuranData() {
-  try {
-    console.log('Service Worker: Syncing offline data...');
-    
-    // Get offline data from IndexedDB
-    const offlineData = await getOfflineData();
-    
-    if (offlineData && offlineData.length > 0) {
-      // Send data to Firebase when online
-      const response = await fetch('/api/sync-offline-data', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(offlineData)
-      });
-      
-      if (response.ok) {
-        console.log('Service Worker: Offline data synced successfully');
-        await clearOfflineData();
-      } else {
-        console.error('Service Worker: Failed to sync offline data');
-      }
-    }
-  } catch (error) {
-    console.error('Service Worker: Error syncing offline data:', error);
-  }
-}
-
-// IndexedDB helpers for offline data storage
-async function getOfflineData() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('QuranTrackerOffline', 1);
-    
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      const db = request.result;
-      const transaction = db.transaction(['offline_changes'], 'readonly');
-      const store = transaction.objectStore('offline_changes');
-      const getAllRequest = store.getAll();
-      
-      getAllRequest.onsuccess = () => resolve(getAllRequest.result);
-      getAllRequest.onerror = () => reject(getAllRequest.error);
-    };
-    
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains('offline_changes')) {
-        db.createObjectStore('offline_changes', { keyPath: 'id', autoIncrement: true });
-      }
-    };
-  });
-}
-
-async function clearOfflineData() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('QuranTrackerOffline', 1);
-    
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      const db = request.result;
-      const transaction = db.transaction(['offline_changes'], 'readwrite');
-      const store = transaction.objectStore('offline_changes');
-      const clearRequest = store.clear();
-      
-      clearRequest.onsuccess = () => resolve();
-      clearRequest.onerror = () => reject(clearRequest.error);
-    };
-  });
-}
-
-// Handle push notifications (for future use)
-self.addEventListener('push', (event) => {
-  console.log('Service Worker: Push received');
-  
-  const options = {
-    body: 'Time for your daily Quran review!',
-    icon: '/icon-192.png',
-    badge: '/icon-72.png',
-    vibrate: [100, 50, 100],
-    data: {
-      dateOfArrival: Date.now(),
-      primaryKey: 'daily-review'
-    },
-    actions: [
-      {
-        action: 'start-review',
-        title: 'Start Review',
-        icon: '/icon-96.png'
-      },
-      {
-        action: 'dismiss',
-        title: 'Later',
-        icon: '/icon-96.png'
-      }
-    ]
-  };
-  
-  event.waitUntil(
-    self.registration.showNotification('Quran Memorization Tracker', options)
-  );
-});
-
-// Handle notification clicks
-self.addEventListener('notificationclick', (event) => {
-  console.log('Service Worker: Notification clicked:', event.action);
-  
-  event.notification.close();
-  
-  if (event.action === 'start-review') {
-    event.waitUntil(
-      clients.openWindow('/?action=review')
-    );
-  } else if (event.action === 'dismiss') {
-    // Just close the notification
-  } else {
-    // Default action - open the app
-    event.waitUntil(
-      clients.openWindow('/')
-    );
-  }
-});
-
 // Handle messages from the main app
 self.addEventListener('message', (event) => {
-  console.log('Service Worker: Message received:', event.data);
-  
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
-  }
-  
-  if (event.data && event.data.type === 'GET_VERSION') {
-    event.ports[0].postMessage({ version: CACHE_NAME });
-  }
-  
-  if (event.data && event.data.type === 'CACHE_URLS') {
-    event.waitUntil(
-      caches.open(CACHE_NAME)
-        .then((cache) => {
-          return cache.addAll(event.data.urls);
-        })
-        .then(() => {
-          event.ports[0].postMessage({ success: true });
-        })
-        .catch((error) => {
-          event.ports[0].postMessage({ success: false, error: error.message });
-        })
-    );
   }
 });
 

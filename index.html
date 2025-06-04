@@ -1,10 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#2196f3" />
   <meta name="description" content="Track your Quran memorization progress with spaced repetition and quality levels." />
+  
+  <!-- PWA Meta Tags -->
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
   
   <title>Quran Memorization Tracker</title>
   
@@ -33,11 +38,17 @@
     .loading-icon {
       font-size: 3rem;
       margin-bottom: 1rem;
+      animation: pulse 2s ease-in-out infinite;
     }
     
     .loading-text {
       font-size: 1.1rem;
       color: #6c757d;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
     }
 
     @media (prefers-color-scheme: dark) {
@@ -53,6 +64,11 @@
       .loading-text {
         color: #b0b0b0;
       }
+    }
+    
+    #root {
+      width: 100%;
+      height: 100%;
     }
   </style>
 </head>
@@ -71,10 +87,29 @@
   
   <div id="root"></div>
   
+  <!-- THIS IS THE CRITICAL MISSING PIECE - Vite needs this script tag to load your app -->
+  <script type="module" src="/src/main.jsx"></script>
+  
   <script>
-    // Remove loading screen when app loads
-    window.addEventListener('load', () => {
-      setTimeout(() => {
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(registration => console.log('SW registered:', registration))
+          .catch(error => console.log('SW registration failed:', error));
+      });
+    }
+    
+    // Remove loading screen after React mounts
+    let appMounted = false;
+    
+    // Check if React has mounted every 100ms
+    const checkMount = setInterval(() => {
+      const rootElement = document.getElementById('root');
+      if (rootElement && rootElement.children.length > 0) {
+        appMounted = true;
+        clearInterval(checkMount);
+        
         const loadingScreen = document.getElementById('loading-screen');
         if (loadingScreen) {
           loadingScreen.style.opacity = '0';
@@ -83,10 +118,19 @@
             loadingScreen.remove();
           }, 500);
         }
-      }, 1000);
-    });
-
-    console.log('🕌 Quran Memorization Tracker - Loading...');
+      }
+    }, 100);
+    
+    // Fallback: remove loading screen after 5 seconds
+    setTimeout(() => {
+      if (!appMounted) {
+        clearInterval(checkMount);
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+          loadingScreen.remove();
+        }
+      }
+    }, 5000);
   </script>
 </body>
 </html>
