@@ -2,75 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <link rel="icon" href="/favicon.ico" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#2196f3" />
-  <meta name="description" content="Track your Quran memorization progress with spaced repetition and quality levels. Perfect for those aiming to memorize the entire Quran." />
-  
-  <!-- PWA Manifest -->
-  <link rel="manifest" href="/manifest.json" />
-  
-  <!-- Apple Touch Icon and PWA Support -->
-  <link rel="apple-touch-icon" href="/icon-192.png" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="Quran Tracker" />
-  
-  <!-- Apple Splash Screens -->
-  <link rel="apple-touch-startup-image" href="/icon-512.png" />
-  
-  <!-- Microsoft Tiles -->
-  <meta name="msapplication-TileColor" content="#2196f3" />
-  <meta name="msapplication-TileImage" content="/icon-144.png" />
-  <meta name="msapplication-config" content="/browserconfig.xml" />
-  
-  <!-- Additional PWA Meta Tags -->
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="application-name" content="Quran Tracker" />
-  
-  <!-- Icons for different sizes -->
-  <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="/icon-16.png" />
-  
-  <!-- Open Graph Meta Tags for sharing -->
-  <meta property="og:title" content="Quran Memorization Tracker" />
-  <meta property="og:description" content="Track your Quran memorization progress with spaced repetition and quality levels. Perfect for those aiming to memorize the entire Quran." />
-  <meta property="og:image" content="/icon-512.png" />
-  <meta property="og:url" content="https://quran-tracker.app" />
-  <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="Quran Memorization Tracker" />
-  
-  <!-- Twitter Card Meta Tags -->
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Quran Memorization Tracker" />
-  <meta name="twitter:description" content="Track your Quran memorization progress with spaced repetition and quality levels." />
-  <meta name="twitter:image" content="/icon-512.png" />
-  
-  <!-- Additional SEO Meta Tags -->
-  <meta name="keywords" content="Quran, memorization, Hifz, spaced repetition, Islamic, Muslim, review, tracker" />
-  <meta name="author" content="Quran Memorization Tracker" />
-  <meta name="robots" content="index, follow" />
-  
-  <!-- Performance and Security -->
-  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-  <meta name="referrer" content="origin-when-cross-origin" />
-  
-  <!-- Preload critical fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <meta name="description" content="Track your Quran memorization progress with spaced repetition and quality levels." />
   
   <title>Quran Memorization Tracker</title>
   
-  <!-- Critical CSS for faster loading -->
   <style>
-    /* Critical path CSS */
     body {
       margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
       background-color: #ffffff;
       color: #212529;
-      line-height: 1.6;
     }
     
     .loading-screen {
@@ -90,42 +33,13 @@
     .loading-icon {
       font-size: 3rem;
       margin-bottom: 1rem;
-      animation: pulse 2s ease-in-out infinite;
-    }
-    
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.1); }
     }
     
     .loading-text {
       font-size: 1.1rem;
       color: #6c757d;
-      margin-bottom: 2rem;
     }
-    
-    .loading-progress {
-      width: 200px;
-      height: 4px;
-      background-color: #e9ecef;
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    
-    .loading-progress-bar {
-      height: 100%;
-      background: linear-gradient(90deg, #2196f3 0%, #4caf50 100%);
-      border-radius: 2px;
-      animation: loading 2s ease-in-out infinite;
-    }
-    
-    @keyframes loading {
-      0% { width: 0%; }
-      50% { width: 70%; }
-      100% { width: 100%; }
-    }
-    
-    /* Dark mode support */
+
     @media (prefers-color-scheme: dark) {
       body {
         background-color: #1a1a1a;
@@ -139,35 +53,24 @@
       .loading-text {
         color: #b0b0b0;
       }
-      
-      .loading-progress {
-        background-color: #404040;
-      }
     }
   </style>
 </head>
 <body>
   <noscript>
-    <div style="text-align: center; padding: 2rem; font-family: Arial, sans-serif;">
+    <div style="text-align: center; padding: 2rem;">
       <h1>📖 Quran Memorization Tracker</h1>
       <p>You need to enable JavaScript to run this app.</p>
-      <p>This app helps you track your Quran memorization progress with spaced repetition.</p>
     </div>
   </noscript>
   
-  <!-- Loading screen shown while app loads -->
   <div id="loading-screen" class="loading-screen">
     <div class="loading-icon">📖</div>
     <div class="loading-text">Loading Quran Memorization Tracker...</div>
-    <div class="loading-progress">
-      <div class="loading-progress-bar"></div>
-    </div>
   </div>
   
-  <!-- React app root -->
   <div id="root"></div>
   
-  <!-- Service Worker Registration -->
   <script>
     // Remove loading screen when app loads
     window.addEventListener('load', () => {
@@ -183,118 +86,7 @@
       }, 1000);
     });
 
-    // Service Worker Registration
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then((registration) => {
-            console.log('SW registered: ', registration.scope);
-          })
-          .catch((registrationError) => {
-            console.log('SW registration failed: ', registrationError);
-          });
-      });
-    }
-
-    // PWA Install Prompt Management
-    let deferredPrompt;
-    let installPromptShown = false;
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      
-      if (!installPromptShown && !isAppInstalled()) {
-        setTimeout(showInstallPrompt, 3000);
-      }
-    });
-
-    function isAppInstalled() {
-      return window.matchMedia('(display-mode: standalone)').matches ||
-             window.navigator.standalone ||
-             document.referrer.includes('android-app://');
-    }
-
-    function showInstallPrompt() {
-      const lastDismissed = localStorage.getItem('installPromptDismissed');
-      if (lastDismissed && Date.now() - parseInt(lastDismissed) < 7 * 24 * 60 * 60 * 1000) {
-        return;
-      }
-
-      installPromptShown = true;
-      window.dispatchEvent(new CustomEvent('showInstallPrompt', {
-        detail: { deferredPrompt }
-      }));
-    }
-
-    window.addEventListener('appinstalled', (evt) => {
-      console.log('App was installed successfully');
-    });
-
-    function updateNetworkStatus() {
-      const isOnline = navigator.onLine;
-      const statusElement = document.getElementById('network-status');
-      
-      if (!isOnline && !statusElement) {
-        const offlineIndicator = document.createElement('div');
-        offlineIndicator.id = 'network-status';
-        offlineIndicator.innerHTML = `
-          <div style="
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: #ff9800;
-            color: white;
-            padding: 0.5rem;
-            text-align: center;
-            font-size: 0.9rem;
-            z-index: 9999;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          ">
-            📶 You're offline. Changes will sync when connection is restored.
-          </div>
-        `;
-        document.body.appendChild(offlineIndicator);
-      } else if (isOnline && statusElement) {
-        statusElement.remove();
-      }
-    }
-
-    window.addEventListener('online', updateNetworkStatus);
-    window.addEventListener('offline', updateNetworkStatus);
-    updateNetworkStatus();
-
-    console.log('🕌 Quran Memorization Tracker - PWA initialized');
-  </script>
-  
-  <!-- Structured Data for SEO -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    "name": "Quran Memorization Tracker",
-    "description": "Track your Quran memorization progress with spaced repetition and quality levels. Perfect for those aiming to memorize the entire Quran.",
-    "url": "https://quran-tracker.app",
-    "applicationCategory": "EducationalApplication",
-    "operatingSystem": "Any",
-    "offers": {
-      "@type": "Offer",
-      "price": "0",
-      "priceCurrency": "USD"
-    },
-    "author": {
-      "@type": "Organization",
-      "name": "Quran Memorization Tracker"
-    },
-    "screenshot": "/icon-512.png",
-    "softwareVersion": "2.0",
-    "aggregateRating": {
-      "@type": "AggregateRating",
-      "ratingValue": "5.0",
-      "ratingCount": "1"
-    }
-  }
+    console.log('🕌 Quran Memorization Tracker - Loading...');
   </script>
 </body>
 </html>
