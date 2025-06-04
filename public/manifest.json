@@ -1,53 +1,158 @@
 {
   "name": "Quran Memorization Tracker",
   "short_name": "Quran Tracker",
-  "description": "Track your Quran memorization progress with spaced repetition and quality levels",
+  "description": "Track your Quran memorization progress with spaced repetition and quality levels. Perfect for those aiming to memorize the entire Quran.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2196f3",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "scope": "/",
+  "lang": "en",
+  "categories": ["education", "lifestyle", "productivity", "books"],
   "icons": [
     {
       "src": "/icon-72.png",
       "sizes": "72x72",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/icon-96.png",
       "sizes": "96x96",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/icon-128.png",
       "sizes": "128x128",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/icon-144.png",
       "sizes": "144x144",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/icon-152.png",
       "sizes": "152x152",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/icon-384.png",
       "sizes": "384x384",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
-  ]
+  ],
+  "shortcuts": [
+    {
+      "name": "Today's Review",
+      "short_name": "Review",
+      "description": "Start your daily Quran review session",
+      "url": "/?action=review",
+      "icons": [
+        {
+          "src": "/icon-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Add Pages",
+      "short_name": "Add",
+      "description": "Add newly memorized pages to your collection",
+      "url": "/?action=add",
+      "icons": [
+        {
+          "src": "/icon-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Progress",
+      "short_name": "Progress",
+      "description": "View your memorization progress and statistics",
+      "url": "/?action=progress",
+      "icons": [
+        {
+          "src": "/icon-96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-mobile-1.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Today's Review screen showing daily pages to review"
+    },
+    {
+      "src": "/screenshot-mobile-2.png",
+      "sizes": "390x844",
+      "type": "image/png", 
+      "form_factor": "narrow",
+      "label": "Progress dashboard with medal distribution"
+    },
+    {
+      "src": "/screenshot-desktop.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Full desktop interface with onboarding flow"
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "protocol_handlers": [
+    {
+      "protocol": "web+qurantracker",
+      "url": "/?share=%s"
+    }
+  ],
+  "share_target": {
+    "action": "/share",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "file_handlers": [
+    {
+      "action": "/import",
+      "accept": {
+        "application/json": [".json"]
+      }
+    }
+  ],
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  }
 }
