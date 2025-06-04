@@ -1,12 +1,23 @@
-// App.jsx - Main component with Firebase integration
-import { useEffect } from 'react';
+// App.jsx - Enhanced with onboarding flow and medal system
+import { useEffect, useState } from 'react';
 import { useQuranTracker } from './useQuranTracker.js';
 import { surahInfo, getRank } from './quranData.js';
 import { useStorage } from './useStorage.js';
 import { setupTheme, styles, getColorStyle } from './styles.js';
+import { useOnboarding } from './useOnboarding.js';
+import { OnboardingFlow } from './OnboardingFlow.jsx';
+import { 
+  TodaysReviewEnhanced, 
+  QualityUpgradeModal, 
+  ProgressDashboard, 
+  AddPagesFlow, 
+  CycleComplete, 
+  InstallPrompt,
+  MedalBadge 
+} from './EnhancedComponents.jsx';
 
 export default function App() {
-  // Get everything from the custom hook (now includes Firebase)
+  // Get everything from the custom hook (now includes Firebase and onboarding)
   const {
     // Core state
     memorizedPages,
@@ -65,14 +76,117 @@ export default function App() {
     dismissSignInBanner,
     switchToLocal,
     resolveDataConflict,
+    
+    // New onboarding functions
+    completeOnboardingSetup,
+    shouldShowOnboarding,
   } = useQuranTracker();
 
   const { migrateToCloud } = useStorage(user);
+
+  // Onboarding state
+  const {
+    isFirstTime,
+    onboardingComplete,
+    showQualityUpgrade,
+    currentUpgradePage,
+    currentUpgradeQuality,
+    showCycleComplete,
+    cycleStats,
+    triggerQualityUpgrade,
+    handleQualityUpgrade,
+    closeQualityUpgrade,
+    triggerCycleComplete,
+    closeCycleComplete,
+  } = useOnboarding(user, isCloudSync);
+
+  // Enhanced UI state
+  const [showAddPages, setShowAddPages] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 
   // Setup theme on mount
   useEffect(() => {
     const cleanup = setupTheme();
     return cleanup;
+  }, []);
+
+  // Handle PWA install prompt
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallPrompt(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  // Handle app installed
+  useEffect(() => {
+    const handleAppInstalled = () => {
+      console.log('App was installed successfully');
+      setShowInstallPrompt(false);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  // Enhanced complete review with quality upgrade prompt
+  const handleCompleteReview = () => {
+    if (todaysPages.length > 0) {
+      // Show quality upgrade for the first page reviewed
+      const firstPage = todaysPages[0];
+      triggerQualityUpgrade(firstPage.page, firstPage.color);
+    }
+    completeReview();
+  };
+
+  // Handle adding new pages
+  const handleAddPages = (newPages) => {
+    Object.entries(newPages).forEach(([pageNum, quality]) => {
+      if (!memorizedPages[pageNum]) {
+        togglePage(parseInt(pageNum));
+        if (quality !== 'red') {
+          setTimeout(() => changePageColor(parseInt(pageNum), quality), 100);
+        }
+      }
+    });
+  };
+
+  // Handle PWA install
+  const handleInstall = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`User response to the install prompt: ${outcome}`);
+      setDeferredPrompt(null);
+      setShowInstallPrompt(false);
+    }
+  };
+
+  // Handle install prompt dismiss
+  const handleInstallDismiss = () => {
+    setShowInstallPrompt(false);
+    // Auto-hide for 7 days
+    localStorage.setItem('hideInstallPrompt', Date.now() + (7 * 24 * 60 * 60 * 1000));
+  };
+
+  // Check if should show install prompt
+  useEffect(() => {
+    const hideUntil = localStorage.getItem('hideInstallPrompt');
+    if (hideUntil && Date.now() < parseInt(hideUntil)) {
+      setShowInstallPrompt(false);
+    }
   }, []);
 
   // Show loading spinner
@@ -90,6 +204,17 @@ export default function App() {
           <p style={{ color: 'var(--text-secondary)' }}>Loading your data...</p>
         </div>
       </div>
+    );
+  }
+
+  // Show onboarding for new users
+  if (shouldShowOnboarding(memorizedPages) || (isFirstTime && !onboardingComplete)) {
+    return (
+      <OnboardingFlow 
+        onComplete={(selectedPages) => {
+          completeOnboardingSetup(selectedPages);
+        }}
+      />
     );
   }
 
@@ -306,82 +431,18 @@ export default function App() {
         📖 Quran Memorization Tracker
       </h1>
 
-      {/* Today's Review Section */}
-      <div style={styles.primaryCard}>
-        <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>
-          🌅 Today's Review
-        </h2>
-        
-        <div style={{ marginBottom: '1rem' }}>
-          <p style={{ fontSize: '1rem', margin: '0.5rem 0', color: 'var(--text-secondary)' }}>
-            Position: <strong>{currentPosition + 1}</strong> of <strong>{memorizedPagesList.length}</strong> pages
-          </p>
-          <p style={{ fontSize: '0.875rem', margin: '0.5rem 0', color: 'var(--text-secondary)' }}>
-            🔄 {remainingDays} days remaining • Full cycle: {estimatedCycleDuration} days
-          </p>
-        </div>
+      {/* Enhanced Today's Review Section */}
+      <TodaysReviewEnhanced
+        todaysPages={todaysPages}
+        currentPosition={currentPosition}
+        memorizedPagesList={memorizedPagesList}
+        remainingDays={remainingDays}
+        estimatedCycleDuration={estimatedCycleDuration}
+        lastReviewDate={lastReviewDate}
+        onCompleteReview={handleCompleteReview}
+      />
 
-        {todaysPages.length > 0 && (
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>
-              📚 Review these pages today:
-            </h3>
-            
-            <div style={{
-              ...styles.card,
-              backgroundColor: 'var(--bg-accent, #e3f2fd)',
-              marginBottom: '1rem',
-              textAlign: 'center'
-            }}>
-              <strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>
-                Total Difficulty: {todaysPages.reduce((sum, page) => sum + getRank(page.color), 0)}/4
-              </strong>
-              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                🟢🟢 = 1 • 🟢 = 2 • 🔴 = 3
-              </div>
-            </div>
-
-            <div style={{ ...styles.flexWrap, justifyContent: 'center' }}>
-              {todaysPages.map((page, idx) => (
-                <div key={idx} style={{
-                  ...getColorStyle(page.color),
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  minWidth: '100px',
-                  padding: '1rem'
-                }}>
-                  <span style={{ fontWeight: 'bold', fontSize: '1rem' }}>
-                    Page {page.page}
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '0.875rem' }}>Rank {getRank(page.color)}</span>
-                    <span style={{ fontSize: '1.2rem' }}>
-                      {page.color === 'super-green' ? '🟢🟢' : page.color === 'green' ? '🟢' : '🔴'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <button
-          style={{ ...styles.button, ...styles.primaryButton, width: '100%' }}
-          onClick={completeReview}
-        >
-          ✅ Complete Review & Next
-        </button>
-
-        {lastReviewDate && (
-          <p style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
-            Last review: {lastReviewDate}
-          </p>
-        )}
-      </div>
-
-      {/* Action Buttons */}
+      {/* Enhanced Action Buttons */}
       <div style={styles.flexWrap}>
         <button
           style={{ ...styles.button, ...styles.secondaryButton }}
@@ -396,145 +457,30 @@ export default function App() {
         >
           {showOverview ? '📊 Hide' : '📈 Show'} Overview
         </button>
+
+        <button
+          style={{ ...styles.button, ...styles.primaryButton }}
+          onClick={() => setShowAddPages(true)}
+        >
+          📝 Add Pages
+        </button>
       </div>
 
-      {/* Progress Overview */}
+      {/* Enhanced Progress Overview */}
       {showOverview && (
-        <div style={styles.card}>
-          <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', textAlign: 'center', color: 'var(--text-primary)' }}>
-            📊 Progress Overview
-          </h3>
-
-          <div style={styles.mobileGrid}>
-            <div style={{
-              ...styles.statCard,
-              backgroundColor: 'var(--danger-color, #ffcdd2)',
-              color: 'white'
-            }}>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-                {memorizedPagesList.filter((p) => p.color === 'red').length}
-              </div>
-              <div style={{ fontSize: '0.875rem' }}>🔴 Red Pages</div>
-              <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>Need more work</div>
-            </div>
-
-            <div style={{
-              ...styles.statCard,
-              backgroundColor: 'var(--success-color, #c8e6c9)',
-              color: 'white'
-            }}>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-                {memorizedPagesList.filter((p) => p.color === 'green').length}
-              </div>
-              <div style={{ fontSize: '0.875rem' }}>🟢 Green Pages</div>
-              <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>Well known</div>
-            </div>
-
-            <div style={{
-              ...styles.statCard,
-              backgroundColor: '#1b5e20',
-              color: 'white'
-            }}>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-                {memorizedPagesList.filter((p) => p.color === 'super-green').length}
-              </div>
-              <div style={{ fontSize: '0.875rem' }}>🟢🟢 Super Green</div>
-              <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>Very solid</div>
-            </div>
-
-            <div style={{
-              ...styles.statCard,
-              backgroundColor: 'var(--info-color, #e1f5fe)',
-              color: 'white'
-            }}>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-                {memorizedPagesList.length}
-              </div>
-              <div style={{ fontSize: '0.875rem' }}>📖 Total Pages</div>
-              <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>
-                {Math.round((memorizedPagesList.length / 604) * 100)}% of Quran
-              </div>
-            </div>
-          </div>
-
-          {/* Review History */}
-          <div style={{ marginTop: '2rem' }}>
-            <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>
-              📈 Review History
-            </h4>
-            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-              {reviewHistory.length === 0 ? (
-                <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', textAlign: 'center', padding: '2rem' }}>
-                  No review history yet. Complete a review to see your progress!
-                </p>
-              ) : (
-                reviewHistory.map((entry, index) => (
-                  <div key={index} style={{
-                    marginBottom: '1rem',
-                    padding: '1rem',
-                    backgroundColor: 'var(--bg-primary)',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border-color)',
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '0.75rem',
-                      flexWrap: 'wrap',
-                      gap: '0.5rem'
-                    }}>
-                      <strong style={{ color: 'var(--text-primary)' }}>{entry.date}</strong>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                          Position {entry.position}
-                        </span>
-                        {entry.cycleCompleted && (
-                          <span style={{
-                            fontSize: '0.75rem',
-                            backgroundColor: 'var(--success-color)',
-                            color: 'white',
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '12px',
-                          }}>
-                            🎉 Cycle Complete
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div style={{ fontSize: '0.875rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
-                      <strong>Pages reviewed:</strong> {entry.pagesReviewed.map((p) => `P${p.page}`).join(', ')}
-                    </div>
-
-                    <div style={{
-                      fontSize: '0.875rem',
-                      color: 'var(--text-secondary)',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      flexWrap: 'wrap',
-                      gap: '0.5rem'
-                    }}>
-                      <span>
-                        Difficulty: {entry.pagesReviewed
-                          .map((p) => p.color === 'super-green' ? '🟢🟢' : p.color === 'green' ? '🟢' : '🔴')
-                          .join(' ')}
-                      </span>
-                      <span>Rank: {entry.totalRank}/4</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
+        <ProgressDashboard
+          memorizedPages={memorizedPages}
+          reviewHistory={reviewHistory}
+          currentPosition={currentPosition}
+          memorizedPagesList={memorizedPagesList}
+        />
       )}
 
-      {/* Page Selector */}
+      {/* Enhanced Page Selector */}
       {showPageSelector && (
         <div style={styles.card}>
           <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', color: 'var(--text-primary)' }}>
-            📝 Select Memorized Pages
+            📝 Manage Your Pages
           </h3>
 
           <input
@@ -619,7 +565,7 @@ export default function App() {
                     <div style={{ padding: '1rem', backgroundColor: 'var(--bg-primary)' }}>
                       <div style={{ 
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
                         gap: '0.5rem'
                       }}>
                         {Array.from(
@@ -634,7 +580,7 @@ export default function App() {
                             border: '2px solid var(--border-color)',
                             borderRadius: '8px',
                             backgroundColor: memorizedPages[pageNum] ? 'var(--bg-accent)' : 'var(--bg-secondary)',
-                            minHeight: '80px',
+                            minHeight: '100px',
                             justifyContent: 'center',
                             gap: '0.5rem'
                           }}>
@@ -656,20 +602,24 @@ export default function App() {
                               P{pageNum}
                             </label>
                             {memorizedPages[pageNum] && (
-                              <select
-                                value={memorizedPages[pageNum]}
-                                onChange={(e) => changePageColor(pageNum, e.target.value)}
-                                style={{
-                                  ...styles.select,
-                                  ...getColorStyle(memorizedPages[pageNum]),
-                                  width: '100%',
-                                  textAlign: 'center'
-                                }}
-                              >
-                                <option value="red">🔴 Red</option>
-                                <option value="green">🟢 Green</option>
-                                <option value="super-green">🟢🟢 Super</option>
-                              </select>
+                              <div style={{ width: '100%', textAlign: 'center' }}>
+                                <MedalBadge quality={memorizedPages[pageNum]} size="small" />
+                                <select
+                                  value={memorizedPages[pageNum]}
+                                  onChange={(e) => changePageColor(pageNum, e.target.value)}
+                                  style={{
+                                    ...styles.select,
+                                    width: '100%',
+                                    textAlign: 'center',
+                                    marginTop: '0.5rem',
+                                    fontSize: '0.8rem'
+                                  }}
+                                >
+                                  <option value="red">🥉 Bronze</option>
+                                  <option value="green">🥈 Silver</option>
+                                  <option value="super-green">🥇 Gold</option>
+                                </select>
+                              </div>
                             )}
                           </div>
                         ))}
@@ -683,35 +633,35 @@ export default function App() {
         </div>
       )}
 
-      {/* Statistics */}
+      {/* Enhanced Statistics */}
       <div style={styles.card}>
         <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>
-          📊 Statistics
+          📊 Medal Distribution
         </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', fontSize: '0.875rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '1rem', fontSize: '0.875rem' }}>
           <div style={{ textAlign: 'center', padding: '0.75rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
             <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
               {memorizedPagesList.length}
             </div>
-            <div style={{ color: 'var(--text-secondary)' }}>Total Pages</div>
+            <div style={{ color: 'var(--text-secondary)' }}>📖 Total Pages</div>
           </div>
-          <div style={{ textAlign: 'center', padding: '0.75rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--danger-color)' }}>
+          <div style={{ textAlign: 'center', padding: '0.75rem', backgroundColor: '#CD7F32', color: 'white', borderRadius: '8px' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
               {memorizedPagesList.filter((p) => p.color === 'red').length}
             </div>
-            <div style={{ color: 'var(--text-secondary)' }}>🔴 Red</div>
+            <div style={{ fontSize: '0.875rem' }}>🥉 Bronze</div>
           </div>
-          <div style={{ textAlign: 'center', padding: '0.75rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--success-color)' }}>
+          <div style={{ textAlign: 'center', padding: '0.75rem', backgroundColor: '#C0C0C0', color: 'white', borderRadius: '8px' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
               {memorizedPagesList.filter((p) => p.color === 'green').length}
             </div>
-            <div style={{ color: 'var(--text-secondary)' }}>🟢 Green</div>
+            <div style={{ fontSize: '0.875rem' }}>🥈 Silver</div>
           </div>
-          <div style={{ textAlign: 'center', padding: '0.75rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1b5e20' }}>
+          <div style={{ textAlign: 'center', padding: '0.75rem', backgroundColor: '#FFD700', color: '#333', borderRadius: '8px' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
               {memorizedPagesList.filter((p) => p.color === 'super-green').length}
             </div>
-            <div style={{ color: 'var(--text-secondary)' }}>🟢🟢 Super</div>
+            <div style={{ fontSize: '0.875rem' }}>🥇 Gold</div>
           </div>
         </div>
       </div>
@@ -792,6 +742,41 @@ export default function App() {
           Your data is {isCloudSync ? 'synced to the cloud' : 'saved locally'}
         </p>
       </div>
+
+      {/* Enhanced Modals */}
+      {showQualityUpgrade && (
+        <QualityUpgradeModal
+          page={currentUpgradePage}
+          currentQuality={currentUpgradeQuality}
+          onUpgrade={(page, quality) => {
+            handleQualityUpgrade(page, quality, changePageColor);
+          }}
+          onClose={closeQualityUpgrade}
+        />
+      )}
+
+      {showAddPages && (
+        <AddPagesFlow
+          memorizedPages={memorizedPages}
+          onAddPages={handleAddPages}
+          onClose={() => setShowAddPages(false)}
+        />
+      )}
+
+      {showCycleComplete && (
+        <CycleComplete
+          stats={cycleStats}
+          onContinue={closeCycleComplete}
+        />
+      )}
+
+      {/* PWA Install Prompt */}
+      {showInstallPrompt && deferredPrompt && (
+        <InstallPrompt
+          onInstall={handleInstall}
+          onDismiss={handleInstallDismiss}
+        />
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-// useQuranTracker.js - Updated with real-time Firebase sync
+// useQuranTracker.js - Enhanced with onboarding integration and medal system
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   defaultMemorizedPages,
@@ -13,6 +13,7 @@ import {
 } from './quranData.js';
 import { useAuth } from './useAuth.js';
 import { useStorage } from './useStorage.js';
+import { medalHelpers } from './useOnboarding.js';
 
 export const useQuranTracker = () => {
   // Authentication
@@ -47,9 +48,41 @@ export const useQuranTracker = () => {
   const [conflictData, setConflictData] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Onboarding state
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
+  const [isFirstTime, setIsFirstTime] = useState(true);
+
   // Prevent infinite update loops when receiving cloud updates
   const isUpdatingFromCloud = useRef(false);
   const saveTimeout = useRef(null);
+  const lastLocalUpdate = useRef(Date.now());
+
+  // Check onboarding status
+  useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      if (authLoading) return;
+      
+      try {
+        const [pages, onboardingStatus] = await Promise.all([
+          loadData('memorizedPages', {}),
+          loadData('onboardingComplete', false)
+        ]);
+
+        // If user has pages or onboarding is complete, they're not first time
+        if (Object.keys(pages).length > 0 || onboardingStatus) {
+          setOnboardingComplete(true);
+          setIsFirstTime(false);
+        } else {
+          setOnboardingComplete(false);
+          setIsFirstTime(true);
+        }
+      } catch (error) {
+        console.error('Error checking onboarding status:', error);
+      }
+    };
+
+    checkOnboardingStatus();
+  }, [authLoading, loadData]);
 
   // Register cloud update callbacks for real-time sync
   useEffect(() => {
@@ -60,7 +93,7 @@ export const useQuranTracker = () => {
           console.log('Updating memorizedPages from cloud');
           isUpdatingFromCloud.current = true;
           setMemorizedPages(data);
-          setTimeout(() => { isUpdatingFromCloud.current = false; }, 100);
+          setTimeout(() => { isUpdatingFromCloud.current = false; }, 1000);
         }
       });
 
@@ -70,7 +103,7 @@ export const useQuranTracker = () => {
           console.log('Updating currentPosition from cloud');
           isUpdatingFromCloud.current = true;
           setCurrentPosition(data);
-          setTimeout(() => { isUpdatingFromCloud.current = false; }, 100);
+          setTimeout(() => { isUpdatingFromCloud.current = false; }, 1000);
         }
       });
 
@@ -80,7 +113,7 @@ export const useQuranTracker = () => {
           console.log('Updating lastReviewDate from cloud');
           isUpdatingFromCloud.current = true;
           setLastReviewDate(data);
-          setTimeout(() => { isUpdatingFromCloud.current = false; }, 100);
+          setTimeout(() => { isUpdatingFromCloud.current = false; }, 1000);
         }
       });
 
@@ -90,7 +123,18 @@ export const useQuranTracker = () => {
           console.log('Updating reviewHistory from cloud');
           isUpdatingFromCloud.current = true;
           setReviewHistory(data);
-          setTimeout(() => { isUpdatingFromCloud.current = false; }, 100);
+          setTimeout(() => { isUpdatingFromCloud.current = false; }, 1000);
+        }
+      });
+
+      // Register callback for onboarding status
+      registerCloudUpdateCallback('onboardingComplete', (data) => {
+        if (!isUpdatingFromCloud.current) {
+          console.log('Updating onboardingComplete from cloud');
+          setOnboardingComplete(data);
+          if (data) {
+            setIsFirstTime(false);
+          }
         }
       });
     }
@@ -104,17 +148,35 @@ export const useQuranTracker = () => {
       try {
         setLoading(true);
         
-        const [pages, position, reviewDate, history] = await Promise.all([
+        const [pages, position, reviewDate, history, onboardingStatus] = await Promise.all([
           loadData('memorizedPages', defaultMemorizedPages),
           loadData('currentPosition', 0),
           loadData('lastReviewDate', null),
-          loadData('reviewHistory', [])
+          loadData('reviewHistory', []),
+          loadData('onboardingComplete', false)
         ]);
 
         setMemorizedPages(pages);
         setCurrentPosition(position);
         setLastReviewDate(reviewDate);
         setReviewHistory(history);
+        setOnboardingComplete(onboardingStatus);
+
+        // If user has data but no onboarding flag, auto-complete onboarding
+        if (Object.keys(pages).length > 0 && !onboardingStatus) {
+          setOnboardingComplete(true);
+          setIsFirstTime(false);
+          // Save the onboarding completion status
+          setTimeout(() => {
+            saveAllData({
+              memorizedPages: pages,
+              currentPosition: position,
+              lastReviewDate: reviewDate,
+              reviewHistory: history,
+              onboardingComplete: true
+            });
+          }, 500);
+        }
       } catch (error) {
         console.error('Error loading initial data:', error);
       } finally {
@@ -123,38 +185,97 @@ export const useQuranTracker = () => {
     };
 
     loadInitialData();
-  }, [authLoading, loadData]);
+  }, [authLoading, loadData, saveAllData]);
 
-  // Debounced auto-save function
+  // Debounced auto-save function with better conflict prevention
   const debouncedSave = useCallback(() => {
-    // Don't save if we're updating from cloud to prevent loops
-    if (isUpdatingFromCloud.current) return;
+    // Don't save if we're updating from cloud
+    if (isUpdatingFromCloud.current) {
+      console.log('Skipping save - updating from cloud');
+      return;
+    }
+    
+    // Don't save if we recently received a cloud update
+    const timeSinceLastUpdate = Date.now() - lastLocalUpdate.current;
+    if (timeSinceLastUpdate < 2000) {
+      console.log('Skipping save - recent cloud update');
+      return;
+    }
     
     if (saveTimeout.current) {
       clearTimeout(saveTimeout.current);
     }
     
     saveTimeout.current = setTimeout(() => {
-      if (!loading && !authLoading) {
+      if (!loading && !authLoading && !isUpdatingFromCloud.current) {
+        console.log('Saving data to cloud');
         saveAllData({
           memorizedPages,
           currentPosition,
           lastReviewDate,
           reviewHistory,
+          onboardingComplete
         });
       }
-    }, 500); // 500ms debounce
-  }, [memorizedPages, currentPosition, lastReviewDate, reviewHistory, loading, authLoading, saveAllData]);
+    }, 1000);
+  }, [memorizedPages, currentPosition, lastReviewDate, reviewHistory, onboardingComplete, loading, authLoading, saveAllData]);
 
-  // Auto-save when data changes (with debouncing)
+  // Track when we make local changes (not from cloud)
+  const makeLocalChange = useCallback((updateFunction) => {
+    if (!isUpdatingFromCloud.current) {
+      lastLocalUpdate.current = Date.now();
+      updateFunction();
+    }
+  }, []);
+
+  // Auto-save when data changes (with better conflict prevention)
   useEffect(() => {
-    debouncedSave();
+    if (!isUpdatingFromCloud.current) {
+      debouncedSave();
+    }
     return () => {
       if (saveTimeout.current) {
         clearTimeout(saveTimeout.current);
       }
     };
-  }, [debouncedSave]);
+  }, [memorizedPages, currentPosition, lastReviewDate, reviewHistory, onboardingComplete, debouncedSave]);
+
+  // Complete onboarding setup
+  const completeOnboardingSetup = useCallback((selectedPages) => {
+    try {
+      makeLocalChange(() => {
+        setMemorizedPages(selectedPages);
+        setCurrentPosition(0);
+        setLastReviewDate(null);
+        setReviewHistory([]);
+        setOnboardingComplete(true);
+        setIsFirstTime(false);
+      });
+
+      // Track onboarding completion for analytics
+      console.log('Onboarding completed with', Object.keys(selectedPages).length, 'pages');
+      
+      return true;
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      return false;
+    }
+  }, [makeLocalChange]);
+
+  // Check if should show onboarding
+  const shouldShowOnboarding = useCallback((pages) => {
+    // Always show onboarding if explicitly first time and not complete
+    if (isFirstTime && !onboardingComplete) {
+      return true;
+    }
+    
+    // Show if no pages and no onboarding completion
+    if ((!pages || Object.keys(pages).length === 0) && !onboardingComplete) {
+      return true;
+    }
+    
+    return false;
+  }, [isFirstTime, onboardingComplete]);
 
   // Handle sign in and data migration
   const handleSignInAndMigrate = async () => {
@@ -166,7 +287,8 @@ export const useQuranTracker = () => {
         memorizedPages,
         currentPosition,
         lastReviewDate,
-        reviewHistory
+        reviewHistory,
+        onboardingComplete
       };
 
       // Check if cloud data exists and handle conflicts
@@ -195,13 +317,15 @@ export const useQuranTracker = () => {
         setCurrentPosition(cloudData.currentPosition || 0);
         setLastReviewDate(cloudData.lastReviewDate || null);
         setReviewHistory(cloudData.reviewHistory || []);
+        setOnboardingComplete(cloudData.onboardingComplete || false);
       } else {
         // Use local data and overwrite cloud
         await migrateToCloud({
           memorizedPages,
           currentPosition,
           lastReviewDate,
-          reviewHistory
+          reviewHistory,
+          onboardingComplete
         });
       }
       
@@ -218,55 +342,79 @@ export const useQuranTracker = () => {
   const estimatedCycleDuration = getEstimatedCycleDuration(memorizedPages);
   const remainingDays = getRemainingDays(memorizedPages, currentPosition);
 
-  // Page management functions
+  // Page management functions (updated to track local changes)
   const togglePage = (pageNum) => {
-    const newMemorized = { ...memorizedPages };
-    if (newMemorized[pageNum]) {
-      delete newMemorized[pageNum];
-    } else {
-      newMemorized[pageNum] = 'red';
-    }
-    setMemorizedPages(newMemorized);
+    makeLocalChange(() => {
+      const newMemorized = { ...memorizedPages };
+      if (newMemorized[pageNum]) {
+        delete newMemorized[pageNum];
+        // Track quality change
+        medalHelpers.trackQualityChange(pageNum, newMemorized[pageNum], null, 'removed');
+      } else {
+        newMemorized[pageNum] = 'red';
+        // Track quality change
+        medalHelpers.trackQualityChange(pageNum, null, 'red', 'added');
+      }
+      setMemorizedPages(newMemorized);
+    });
   };
 
   const changePageColor = (pageNum, color) => {
-    setMemorizedPages((prev) => ({
-      ...prev,
-      [pageNum]: color,
-    }));
+    makeLocalChange(() => {
+      const oldColor = memorizedPages[pageNum];
+      setMemorizedPages((prev) => ({
+        ...prev,
+        [pageNum]: color,
+      }));
+      
+      // Track quality change
+      if (oldColor !== color) {
+        const direction = oldColor === 'red' && color !== 'red' ? 'upgrade' :
+                         oldColor !== 'red' && color === 'red' ? 'downgrade' : 'change';
+        medalHelpers.trackQualityChange(pageNum, oldColor, color, direction);
+      }
+    });
   };
 
-  // Review management
+  // Enhanced review management with cycle completion detection
   const completeReview = () => {
-    const newPosition = currentPosition + todaysPages.length;
-    const reviewDate = new Date().toLocaleDateString();
+    makeLocalChange(() => {
+      const newPosition = currentPosition + todaysPages.length;
+      const reviewDate = new Date().toLocaleDateString();
+      const cycleCompleted = newPosition >= memorizedPagesList.length;
 
-    const newHistoryEntry = {
-      date: reviewDate,
-      pagesReviewed: todaysPages.map((p) => ({
-        page: p.page,
-        color: p.color,
-        rank: getRank(p.color),
-      })),
-      totalRank: todaysPages.reduce((sum, page) => sum + getRank(page.color), 0),
-      position: currentPosition + 1,
-      cycleCompleted: newPosition >= memorizedPagesList.length,
-    };
+      const newHistoryEntry = {
+        date: reviewDate,
+        pagesReviewed: todaysPages.map((p) => ({
+          page: p.page,
+          color: p.color,
+          rank: getRank(p.color),
+        })),
+        totalRank: todaysPages.reduce((sum, page) => sum + getRank(page.color), 0),
+        position: currentPosition + 1,
+        cycleCompleted,
+      };
 
-    setReviewHistory((prev) => [newHistoryEntry, ...prev].slice(0, 30));
+      setReviewHistory((prev) => [newHistoryEntry, ...prev].slice(0, 30));
 
-    if (newPosition >= memorizedPagesList.length) {
-      setCurrentPosition(0);
-    } else {
-      setCurrentPosition(newPosition);
-    }
-    setLastReviewDate(reviewDate);
+      if (cycleCompleted) {
+        setCurrentPosition(0);
+        
+        // Could trigger cycle completion celebration here
+        console.log('🎉 Cycle completed!');
+      } else {
+        setCurrentPosition(newPosition);
+      }
+      setLastReviewDate(reviewDate);
+    });
   };
 
   const resetPosition = () => {
     if (window.confirm('Reset your review position to the beginning?')) {
-      setCurrentPosition(0);
-      setLastReviewDate(null);
+      makeLocalChange(() => {
+        setCurrentPosition(0);
+        setLastReviewDate(null);
+      });
     }
   };
 
@@ -296,15 +444,19 @@ export const useQuranTracker = () => {
       surah.number.toString().includes(surahSearch)
   );
 
-  // Data management functions (updated for cloud sync)
+  // Enhanced data management functions
   const exportData = () => {
+    const stats = medalHelpers.getQualityStats(memorizedPages);
     const exportData = {
       memorizedPages,
       currentPosition,
       lastReviewDate,
       reviewHistory,
+      onboardingComplete,
+      stats,
+      qualityChanges: medalHelpers.getRecentQualityChanges(),
       exportDate: new Date().toISOString(),
-      version: '1.0',
+      version: '2.0',
     };
 
     const dataStr = JSON.stringify(exportData, null, 2);
@@ -321,19 +473,22 @@ export const useQuranTracker = () => {
   };
 
   const emailData = () => {
+    const stats = medalHelpers.getQualityStats(memorizedPages);
     const exportData = {
       memorizedPages,
       currentPosition,
       lastReviewDate,
       reviewHistory,
+      onboardingComplete,
+      stats,
       exportDate: new Date().toISOString(),
-      version: '1.0',
+      version: '2.0',
     };
 
     const dataStr = JSON.stringify(exportData, null, 2);
-    const subject = encodeURIComponent('Quran Memorization Tracker - Backup Data');
+    const subject = encodeURIComponent('Quran Memorization Tracker - Enhanced Backup Data');
     const body = encodeURIComponent(
-      `Hi,\n\nHere's your Quran memorization tracker backup data.\n\nTo import this data:\n1. Copy the JSON data below\n2. Save it as a .json file\n3. Use the Import button in your tracker\n\nBackup Date: ${new Date().toLocaleString()}\nTotal Memorized Pages: ${Object.keys(memorizedPages).length}\n\n--- JSON DATA (copy everything between the lines) ---\n${dataStr}\n--- END JSON DATA ---\n\nBest regards!`
+      `Assalamu Alaikum,\n\nHere's your enhanced Quran memorization tracker backup data.\n\n📊 Current Progress:\n• Total Pages: ${stats.total}\n• 🥉 Bronze: ${stats.bronze}\n• 🥈 Silver: ${stats.silver}\n• 🥇 Gold: ${stats.gold}\n• Quran Completion: ${stats.quranCompletionPercentage}%\n\nTo import this data:\n1. Copy the JSON data below\n2. Save it as a .json file\n3. Use the Import button in your tracker\n\nBackup Date: ${new Date().toLocaleString()}\n\n--- JSON DATA (copy everything between the lines) ---\n${dataStr}\n--- END JSON DATA ---\n\nBarakAllahu feek!`
     );
 
     const mailtoUrl = `mailto:?subject=${subject}&body=${body}`;
@@ -345,20 +500,29 @@ export const useQuranTracker = () => {
   };
 
   const copyToClipboard = async () => {
+    const stats = medalHelpers.getQualityStats(memorizedPages);
     const exportData = {
       memorizedPages,
       currentPosition,
       lastReviewDate,
       reviewHistory,
+      onboardingComplete,
+      stats,
       exportDate: new Date().toISOString(),
-      version: '1.0',
+      version: '2.0',
     };
 
     const dataStr = JSON.stringify(exportData, null, 2);
-    const emailContent = `Quran Memorization Tracker - Backup Data
+    const emailContent = `📖 Quran Memorization Tracker - Enhanced Backup
+
+📊 Current Progress:
+• Total Pages: ${stats.total}
+• 🥉 Bronze: ${stats.bronze}
+• 🥈 Silver: ${stats.silver}  
+• 🥇 Gold: ${stats.gold}
+• Quran Completion: ${stats.quranCompletionPercentage}%
 
 Backup Date: ${new Date().toLocaleString()}
-Total Memorized Pages: ${Object.keys(memorizedPages).length}
 
 To import this data:
 1. Copy the JSON data below
@@ -371,7 +535,7 @@ ${dataStr}
 
     try {
       await navigator.clipboard.writeText(emailContent);
-      alert('✅ Backup data copied to clipboard!\n\nYou can now paste it into any email, message, or document.');
+      alert('✅ Enhanced backup data copied to clipboard!\n\nIncludes medal statistics and progress tracking.');
     } catch (error) {
       const textArea = document.createElement('textarea');
       textArea.value = emailContent;
@@ -379,7 +543,7 @@ ${dataStr}
       textArea.select();
       document.execCommand('copy');
       document.body.removeChild(textArea);
-      alert('✅ Backup data copied to clipboard!\n\nYou can now paste it into any email, message, or document.');
+      alert('✅ Enhanced backup data copied to clipboard!\n\nIncludes medal statistics and progress tracking.');
     }
   };
 
@@ -392,22 +556,34 @@ ${dataStr}
       try {
         const importedData = JSON.parse(e.target.result);
 
-        if (!importedData.memorizedPages || typeof importedData.memorizedPages !== 'object') {
-          throw new Error('Invalid backup file format');
+        // Validate the imported data
+        const validation = medalHelpers.validatePageSelection(importedData.memorizedPages);
+        if (!validation.isValid) {
+          throw new Error('Invalid backup file: ' + validation.errors.join(', '));
         }
 
-        if (importedData.memorizedPages) setMemorizedPages(importedData.memorizedPages);
-        if (typeof importedData.currentPosition === 'number') setCurrentPosition(importedData.currentPosition);
-        if (importedData.lastReviewDate) setLastReviewDate(importedData.lastReviewDate);
-        if (importedData.reviewHistory && Array.isArray(importedData.reviewHistory)) {
-          setReviewHistory(importedData.reviewHistory);
-        }
+        makeLocalChange(() => {
+          if (importedData.memorizedPages) setMemorizedPages(importedData.memorizedPages);
+          if (typeof importedData.currentPosition === 'number') setCurrentPosition(importedData.currentPosition);
+          if (importedData.lastReviewDate) setLastReviewDate(importedData.lastReviewDate);
+          if (importedData.reviewHistory && Array.isArray(importedData.reviewHistory)) {
+            setReviewHistory(importedData.reviewHistory);
+          }
+          if (typeof importedData.onboardingComplete === 'boolean') {
+            setOnboardingComplete(importedData.onboardingComplete);
+            if (importedData.onboardingComplete) {
+              setIsFirstTime(false);
+            }
+          }
+        });
 
         setImportError('');
+        
+        const stats = medalHelpers.getQualityStats(importedData.memorizedPages);
         alert(
-          `✅ Data imported successfully!\nPages: ${Object.keys(importedData.memorizedPages).length}\nLast backup: ${
+          `✅ Enhanced data imported successfully!\n\n📊 Statistics:\n• Total Pages: ${stats.total}\n• 🥉 Bronze: ${stats.bronze}\n• 🥈 Silver: ${stats.silver}\n• 🥇 Gold: ${stats.gold}\n\nLast backup: ${
             importedData.exportDate ? new Date(importedData.exportDate).toLocaleString() : 'Unknown'
-          }`
+          }\nVersion: ${importedData.version || '1.0'}`
         );
       } catch (error) {
         setImportError("Error importing file. Please check that it's a valid backup file.");
@@ -448,6 +624,12 @@ ${dataStr}
     showDataConflictModal,
     conflictData,
     
+    // Onboarding state
+    onboardingComplete,
+    isFirstTime,
+    shouldShowOnboarding,
+    completeOnboardingSetup,
+    
     // Computed values
     memorizedPagesList,
     todaysPages,
@@ -472,7 +654,7 @@ ${dataStr}
     expandAllSurahs,
     collapseAllSurahs,
     
-    // Data management
+    // Enhanced data management
     exportData,
     emailData,
     copyToClipboard,
