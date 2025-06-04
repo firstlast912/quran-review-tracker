@@ -1,18 +1,14 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import App from './App'
 
-// Simple inline component for testing
-function TestApp() {
-  return (
-    <div style={{ padding: '2rem', textAlign: 'center' }}>
-      <h1>🕌 React is Working!</h1>
-      <p>This is a test component</p>
-    </div>
-  );
-}
+console.log('🔥 main.jsx loading...');
+console.log('📦 App component:', App);
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <TestApp />
+    <App />
   </React.StrictMode>,
 )
+
+console.log('✅ React app mounted');
