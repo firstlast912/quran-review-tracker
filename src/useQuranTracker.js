@@ -1,4 +1,4 @@
-// useQuranTracker.js - Fixed sync conflicts
+// useQuranTracker.js - Updated with real-time Firebase sync
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   defaultMemorizedPages,
@@ -50,7 +50,6 @@ export const useQuranTracker = () => {
   // Prevent infinite update loops when receiving cloud updates
   const isUpdatingFromCloud = useRef(false);
   const saveTimeout = useRef(null);
-  const lastLocalUpdate = useRef(Date.now());
 
   // Register cloud update callbacks for real-time sync
   useEffect(() => {
@@ -61,8 +60,7 @@ export const useQuranTracker = () => {
           console.log('Updating memorizedPages from cloud');
           isUpdatingFromCloud.current = true;
           setMemorizedPages(data);
-          // Extended timeout to ensure auto-save doesn't trigger
-          setTimeout(() => { isUpdatingFromCloud.current = false; }, 1000);
+          setTimeout(() => { isUpdatingFromCloud.current = false; }, 100);
         }
       });
 
@@ -72,7 +70,7 @@ export const useQuranTracker = () => {
           console.log('Updating currentPosition from cloud');
           isUpdatingFromCloud.current = true;
           setCurrentPosition(data);
-          setTimeout(() => { isUpdatingFromCloud.current = false; }, 1000);
+          setTimeout(() => { isUpdatingFromCloud.current = false; }, 100);
         }
       });
 
@@ -82,7 +80,7 @@ export const useQuranTracker = () => {
           console.log('Updating lastReviewDate from cloud');
           isUpdatingFromCloud.current = true;
           setLastReviewDate(data);
-          setTimeout(() => { isUpdatingFromCloud.current = false; }, 1000);
+          setTimeout(() => { isUpdatingFromCloud.current = false; }, 100);
         }
       });
 
@@ -92,7 +90,7 @@ export const useQuranTracker = () => {
           console.log('Updating reviewHistory from cloud');
           isUpdatingFromCloud.current = true;
           setReviewHistory(data);
-          setTimeout(() => { isUpdatingFromCloud.current = false; }, 1000);
+          setTimeout(() => { isUpdatingFromCloud.current = false; }, 100);
         }
       });
     }
@@ -127,28 +125,17 @@ export const useQuranTracker = () => {
     loadInitialData();
   }, [authLoading, loadData]);
 
-  // Debounced auto-save function with better conflict prevention
+  // Debounced auto-save function
   const debouncedSave = useCallback(() => {
-    // Don't save if we're updating from cloud
-    if (isUpdatingFromCloud.current) {
-      console.log('Skipping save - updating from cloud');
-      return;
-    }
-    
-    // Don't save if we recently received a cloud update
-    const timeSinceLastUpdate = Date.now() - lastLocalUpdate.current;
-    if (timeSinceLastUpdate < 2000) { // Wait 2 seconds after cloud update
-      console.log('Skipping save - recent cloud update');
-      return;
-    }
+    // Don't save if we're updating from cloud to prevent loops
+    if (isUpdatingFromCloud.current) return;
     
     if (saveTimeout.current) {
       clearTimeout(saveTimeout.current);
     }
     
     saveTimeout.current = setTimeout(() => {
-      if (!loading && !authLoading && !isUpdatingFromCloud.current) {
-        console.log('Saving data to cloud');
+      if (!loading && !authLoading) {
         saveAllData({
           memorizedPages,
           currentPosition,
@@ -156,28 +143,18 @@ export const useQuranTracker = () => {
           reviewHistory,
         });
       }
-    }, 1000); // Increased debounce to 1 second
+    }, 500); // 500ms debounce
   }, [memorizedPages, currentPosition, lastReviewDate, reviewHistory, loading, authLoading, saveAllData]);
 
-  // Track when we make local changes (not from cloud)
-  const makeLocalChange = useCallback((updateFunction) => {
-    if (!isUpdatingFromCloud.current) {
-      lastLocalUpdate.current = Date.now();
-      updateFunction();
-    }
-  }, []);
-
-  // Auto-save when data changes (with better conflict prevention)
+  // Auto-save when data changes (with debouncing)
   useEffect(() => {
-    if (!isUpdatingFromCloud.current) {
-      debouncedSave();
-    }
+    debouncedSave();
     return () => {
       if (saveTimeout.current) {
         clearTimeout(saveTimeout.current);
       }
     };
-  }, [memorizedPages, currentPosition, lastReviewDate, reviewHistory, debouncedSave]);
+  }, [debouncedSave]);
 
   // Handle sign in and data migration
   const handleSignInAndMigrate = async () => {
@@ -241,63 +218,55 @@ export const useQuranTracker = () => {
   const estimatedCycleDuration = getEstimatedCycleDuration(memorizedPages);
   const remainingDays = getRemainingDays(memorizedPages, currentPosition);
 
-  // Page management functions (updated to track local changes)
+  // Page management functions
   const togglePage = (pageNum) => {
-    makeLocalChange(() => {
-      const newMemorized = { ...memorizedPages };
-      if (newMemorized[pageNum]) {
-        delete newMemorized[pageNum];
-      } else {
-        newMemorized[pageNum] = 'red';
-      }
-      setMemorizedPages(newMemorized);
-    });
+    const newMemorized = { ...memorizedPages };
+    if (newMemorized[pageNum]) {
+      delete newMemorized[pageNum];
+    } else {
+      newMemorized[pageNum] = 'red';
+    }
+    setMemorizedPages(newMemorized);
   };
 
   const changePageColor = (pageNum, color) => {
-    makeLocalChange(() => {
-      setMemorizedPages((prev) => ({
-        ...prev,
-        [pageNum]: color,
-      }));
-    });
+    setMemorizedPages((prev) => ({
+      ...prev,
+      [pageNum]: color,
+    }));
   };
 
-  // Review management (updated to track local changes)
+  // Review management
   const completeReview = () => {
-    makeLocalChange(() => {
-      const newPosition = currentPosition + todaysPages.length;
-      const reviewDate = new Date().toLocaleDateString();
+    const newPosition = currentPosition + todaysPages.length;
+    const reviewDate = new Date().toLocaleDateString();
 
-      const newHistoryEntry = {
-        date: reviewDate,
-        pagesReviewed: todaysPages.map((p) => ({
-          page: p.page,
-          color: p.color,
-          rank: getRank(p.color),
-        })),
-        totalRank: todaysPages.reduce((sum, page) => sum + getRank(page.color), 0),
-        position: currentPosition + 1,
-        cycleCompleted: newPosition >= memorizedPagesList.length,
-      };
+    const newHistoryEntry = {
+      date: reviewDate,
+      pagesReviewed: todaysPages.map((p) => ({
+        page: p.page,
+        color: p.color,
+        rank: getRank(p.color),
+      })),
+      totalRank: todaysPages.reduce((sum, page) => sum + getRank(page.color), 0),
+      position: currentPosition + 1,
+      cycleCompleted: newPosition >= memorizedPagesList.length,
+    };
 
-      setReviewHistory((prev) => [newHistoryEntry, ...prev].slice(0, 30));
+    setReviewHistory((prev) => [newHistoryEntry, ...prev].slice(0, 30));
 
-      if (newPosition >= memorizedPagesList.length) {
-        setCurrentPosition(0);
-      } else {
-        setCurrentPosition(newPosition);
-      }
-      setLastReviewDate(reviewDate);
-    });
+    if (newPosition >= memorizedPagesList.length) {
+      setCurrentPosition(0);
+    } else {
+      setCurrentPosition(newPosition);
+    }
+    setLastReviewDate(reviewDate);
   };
 
   const resetPosition = () => {
     if (window.confirm('Reset your review position to the beginning?')) {
-      makeLocalChange(() => {
-        setCurrentPosition(0);
-        setLastReviewDate(null);
-      });
+      setCurrentPosition(0);
+      setLastReviewDate(null);
     }
   };
 
@@ -427,14 +396,12 @@ ${dataStr}
           throw new Error('Invalid backup file format');
         }
 
-        makeLocalChange(() => {
-          if (importedData.memorizedPages) setMemorizedPages(importedData.memorizedPages);
-          if (typeof importedData.currentPosition === 'number') setCurrentPosition(importedData.currentPosition);
-          if (importedData.lastReviewDate) setLastReviewDate(importedData.lastReviewDate);
-          if (importedData.reviewHistory && Array.isArray(importedData.reviewHistory)) {
-            setReviewHistory(importedData.reviewHistory);
-          }
-        });
+        if (importedData.memorizedPages) setMemorizedPages(importedData.memorizedPages);
+        if (typeof importedData.currentPosition === 'number') setCurrentPosition(importedData.currentPosition);
+        if (importedData.lastReviewDate) setLastReviewDate(importedData.lastReviewDate);
+        if (importedData.reviewHistory && Array.isArray(importedData.reviewHistory)) {
+          setReviewHistory(importedData.reviewHistory);
+        }
 
         setImportError('');
         alert(
