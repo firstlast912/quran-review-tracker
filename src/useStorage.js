@@ -1,4 +1,4 @@
-// useStorage.js - Storage management hook (localStorage + Firebase) with real-time sync
+// useStorage.js - Enhanced Storage management hook with better cloud detection
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { saveUserData, getUserData, subscribeToUserData } from './firebase.js';
 
@@ -17,25 +17,56 @@ export const useStorage = (user) => {
     }));
   }, []);
 
+  // Check if user has cloud data
+  const hasCloudData = useCallback(async (userId) => {
+    if (!userId) return false;
+    
+    try {
+      const cloudData = await getUserData(userId);
+      return cloudData && cloudData.memorizedPages && Object.keys(cloudData.memorizedPages).length > 0;
+    } catch (error) {
+      console.error('Error checking cloud data:', error);
+      return false;
+    }
+  }, []);
+
   // Load data from appropriate source
   const loadData = useCallback(async (key, defaultValue) => {
     try {
-      if (user && isCloudSync) {
-        // Load from Firebase
-        const userData = await getUserData(user.uid);
-        return userData?.[key] || defaultValue;
-      } else {
-        // Load from localStorage
-        const stored = localStorage.getItem(key);
-        return stored ? JSON.parse(stored) : defaultValue;
+      // If user is signed in, check cloud first
+      if (user) {
+        const useCloud = localStorage.getItem('useCloudSync') === 'true';
+        
+        // For signed-in users, check if they have cloud data
+        if (!useCloud) {
+          const hasData = await hasCloudData(user.uid);
+          if (hasData) {
+            // Auto-enable cloud sync for users with existing cloud data
+            console.log('Found existing cloud data, enabling cloud sync');
+            localStorage.setItem('useCloudSync', 'true');
+            setIsCloudSync(true);
+            
+            // Load from Firebase
+            const userData = await getUserData(user.uid);
+            return userData?.[key] || defaultValue;
+          }
+        } else {
+          // User has cloud sync enabled, load from Firebase
+          const userData = await getUserData(user.uid);
+          return userData?.[key] || defaultValue;
+        }
       }
+      
+      // Load from localStorage for non-signed-in users or users without cloud data
+      const stored = localStorage.getItem(key);
+      return stored ? JSON.parse(stored) : defaultValue;
     } catch (error) {
       console.error(`Error loading ${key}:`, error);
       // Fallback to localStorage
       const stored = localStorage.getItem(key);
       return stored ? JSON.parse(stored) : defaultValue;
     }
-  }, [user, isCloudSync]);
+  }, [user, hasCloudData]);
 
   // Save data to appropriate source
   const saveData = useCallback(async (key, value) => {
@@ -102,7 +133,22 @@ export const useStorage = (user) => {
     try {
       setSyncStatus('syncing');
       
-      // Save all local data to Firebase
+      // Check if user already has cloud data
+      const hasExistingData = await hasCloudData(user.uid);
+      
+      if (hasExistingData) {
+        // User has cloud data, don't overwrite - ask them to resolve conflict
+        const cloudData = await getUserData(user.uid);
+        setSyncStatus('idle');
+        return {
+          success: false,
+          conflict: true,
+          cloudData,
+          localData
+        };
+      }
+      
+      // No cloud data, safe to migrate
       await saveUserData(user.uid, localData);
       
       // Switch to cloud sync
@@ -110,12 +156,14 @@ export const useStorage = (user) => {
       localStorage.setItem('useCloudSync', 'true');
       
       setSyncStatus('idle');
+      return { success: true };
     } catch (error) {
       console.error('Error migrating to cloud:', error);
       setSyncStatus('error');
       setTimeout(() => setSyncStatus('idle'), 3000);
+      return { success: false, error: error.message };
     }
-  }, [user]);
+  }, [user, hasCloudData]);
 
   // Switch back to local storage
   const switchToLocal = useCallback(() => {
@@ -171,28 +219,43 @@ export const useStorage = (user) => {
 
   // Check cloud sync preference on user change
   useEffect(() => {
-    if (user) {
-      // Check if user previously enabled cloud sync
-      const useCloud = localStorage.getItem('useCloudSync') === 'true';
-      setIsCloudSync(useCloud);
-    } else {
-      // User signed out, switch to local
-      setIsCloudSync(false);
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
+    const checkCloudStatus = async () => {
+      if (user) {
+        // First check if user has cloud data
+        const hasData = await hasCloudData(user.uid);
+        
+        if (hasData) {
+          // User has cloud data, auto-enable sync
+          console.log('User has existing cloud data, enabling cloud sync');
+          setIsCloudSync(true);
+          localStorage.setItem('useCloudSync', 'true');
+        } else {
+          // Check local preference
+          const useCloud = localStorage.getItem('useCloudSync') === 'true';
+          setIsCloudSync(useCloud);
+        }
+      } else {
+        // User signed out, switch to local
+        setIsCloudSync(false);
+        if (unsubscribeRef.current) {
+          unsubscribeRef.current();
+          unsubscribeRef.current = null;
+        }
       }
-    }
-  }, [user]);
+    };
+    
+    checkCloudStatus();
+  }, [user, hasCloudData]);
 
   return {
     loadData,
     saveData,
-    saveAllData, // New: batch save function
+    saveAllData,
     migrateToCloud,
     switchToLocal,
     isCloudSync,
     syncStatus,
-    registerCloudUpdateCallback, // New: register callbacks for real-time updates
+    registerCloudUpdateCallback,
+    hasCloudData,
   };
 };

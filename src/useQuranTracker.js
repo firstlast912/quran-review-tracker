@@ -1,4 +1,4 @@
-// useQuranTracker.js - Enhanced with onboarding integration and medal system
+// useQuranTracker.js - Enhanced with better onboarding and cloud sync
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   defaultMemorizedPages,
@@ -17,7 +17,16 @@ import { medalHelpers } from './useOnboarding.js';
 
 export const useQuranTracker = () => {
   // Authentication
-  const { user, loading: authLoading, showSignInBanner, handleSignIn, handleSignOut, dismissSignInBanner, syncLocalDataToCloud } = useAuth();
+  const { 
+    user, 
+    loading: authLoading, 
+    showSignInBanner, 
+    handleSignIn, 
+    handleSignOut, 
+    dismissSignInBanner, 
+    syncLocalDataToCloud,
+    checkExistingUser 
+  } = useAuth();
   
   // Storage management (now with real-time sync)
   const { 
@@ -27,11 +36,12 @@ export const useQuranTracker = () => {
     switchToLocal, 
     isCloudSync, 
     syncStatus,
-    registerCloudUpdateCallback 
+    registerCloudUpdateCallback,
+    hasCloudData 
   } = useStorage(user);
 
   // Core state
-  const [memorizedPages, setMemorizedPages] = useState(defaultMemorizedPages);
+  const [memorizedPages, setMemorizedPages] = useState({});
   const [currentPosition, setCurrentPosition] = useState(0);
   const [lastReviewDate, setLastReviewDate] = useState(null);
   const [reviewHistory, setReviewHistory] = useState([]);
@@ -51,6 +61,7 @@ export const useQuranTracker = () => {
   // Onboarding state
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [isFirstTime, setIsFirstTime] = useState(true);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // Prevent infinite update loops when receiving cloud updates
   const isUpdatingFromCloud = useRef(false);
@@ -63,6 +74,18 @@ export const useQuranTracker = () => {
       if (authLoading) return;
       
       try {
+        // For signed-in users, check cloud first
+        if (user) {
+          const hasData = await hasCloudData(user.uid);
+          if (hasData) {
+            // User has cloud data, they're not first time
+            setOnboardingComplete(true);
+            setIsFirstTime(false);
+            return;
+          }
+        }
+        
+        // Check local storage
         const [pages, onboardingStatus] = await Promise.all([
           loadData('memorizedPages', {}),
           loadData('onboardingComplete', false)
@@ -82,7 +105,7 @@ export const useQuranTracker = () => {
     };
 
     checkOnboardingStatus();
-  }, [authLoading, loadData]);
+  }, [authLoading, user, loadData, hasCloudData]);
 
   // Register cloud update callbacks for real-time sync
   useEffect(() => {
@@ -92,7 +115,7 @@ export const useQuranTracker = () => {
         if (!isUpdatingFromCloud.current) {
           console.log('Updating memorizedPages from cloud');
           isUpdatingFromCloud.current = true;
-          setMemorizedPages(data);
+          setMemorizedPages(data || {});
           setTimeout(() => { isUpdatingFromCloud.current = false; }, 1000);
         }
       });
@@ -102,7 +125,7 @@ export const useQuranTracker = () => {
         if (!isUpdatingFromCloud.current) {
           console.log('Updating currentPosition from cloud');
           isUpdatingFromCloud.current = true;
-          setCurrentPosition(data);
+          setCurrentPosition(data || 0);
           setTimeout(() => { isUpdatingFromCloud.current = false; }, 1000);
         }
       });
@@ -112,7 +135,7 @@ export const useQuranTracker = () => {
         if (!isUpdatingFromCloud.current) {
           console.log('Updating lastReviewDate from cloud');
           isUpdatingFromCloud.current = true;
-          setLastReviewDate(data);
+          setLastReviewDate(data || null);
           setTimeout(() => { isUpdatingFromCloud.current = false; }, 1000);
         }
       });
@@ -122,7 +145,7 @@ export const useQuranTracker = () => {
         if (!isUpdatingFromCloud.current) {
           console.log('Updating reviewHistory from cloud');
           isUpdatingFromCloud.current = true;
-          setReviewHistory(data);
+          setReviewHistory(data || []);
           setTimeout(() => { isUpdatingFromCloud.current = false; }, 1000);
         }
       });
@@ -131,7 +154,7 @@ export const useQuranTracker = () => {
       registerCloudUpdateCallback('onboardingComplete', (data) => {
         if (!isUpdatingFromCloud.current) {
           console.log('Updating onboardingComplete from cloud');
-          setOnboardingComplete(data);
+          setOnboardingComplete(data || false);
           if (data) {
             setIsFirstTime(false);
           }
@@ -140,52 +163,66 @@ export const useQuranTracker = () => {
     }
   }, [isCloudSync, registerCloudUpdateCallback]);
 
-  // Load initial data
+  // Load initial data with better cloud handling
   useEffect(() => {
     const loadInitialData = async () => {
-      if (authLoading) return;
+      if (authLoading || dataLoaded) return;
       
       try {
         setLoading(true);
         
+        // Load data (loadData now checks cloud first for signed-in users)
         const [pages, position, reviewDate, history, onboardingStatus] = await Promise.all([
-          loadData('memorizedPages', defaultMemorizedPages),
+          loadData('memorizedPages', {}),
           loadData('currentPosition', 0),
           loadData('lastReviewDate', null),
           loadData('reviewHistory', []),
           loadData('onboardingComplete', false)
         ]);
 
-        setMemorizedPages(pages);
-        setCurrentPosition(position);
+        // Ensure we have valid data
+        const validPages = pages || {};
+        const validPosition = typeof position === 'number' ? position : 0;
+        const validHistory = Array.isArray(history) ? history : [];
+
+        setMemorizedPages(validPages);
+        setCurrentPosition(validPosition);
         setLastReviewDate(reviewDate);
-        setReviewHistory(history);
+        setReviewHistory(validHistory);
         setOnboardingComplete(onboardingStatus);
 
         // If user has data but no onboarding flag, auto-complete onboarding
-        if (Object.keys(pages).length > 0 && !onboardingStatus) {
+        if (Object.keys(validPages).length > 0 && !onboardingStatus) {
           setOnboardingComplete(true);
           setIsFirstTime(false);
           // Save the onboarding completion status
           setTimeout(() => {
             saveAllData({
-              memorizedPages: pages,
-              currentPosition: position,
+              memorizedPages: validPages,
+              currentPosition: validPosition,
               lastReviewDate: reviewDate,
-              reviewHistory: history,
+              reviewHistory: validHistory,
               onboardingComplete: true
             });
           }, 500);
         }
+        
+        setDataLoaded(true);
       } catch (error) {
         console.error('Error loading initial data:', error);
+        // Set defaults on error
+        setMemorizedPages({});
+        setCurrentPosition(0);
+        setLastReviewDate(null);
+        setReviewHistory([]);
+        setOnboardingComplete(false);
       } finally {
         setLoading(false);
       }
     };
 
     loadInitialData();
-  }, [authLoading, loadData, saveAllData]);
+  }, [authLoading, dataLoaded, loadData, saveAllData]);
 
   // Debounced auto-save function with better conflict prevention
   const debouncedSave = useCallback(() => {
@@ -207,8 +244,8 @@ export const useQuranTracker = () => {
     }
     
     saveTimeout.current = setTimeout(() => {
-      if (!loading && !authLoading && !isUpdatingFromCloud.current) {
-        console.log('Saving data to cloud');
+      if (!loading && !authLoading && !isUpdatingFromCloud.current && dataLoaded) {
+        console.log('Saving data');
         saveAllData({
           memorizedPages,
           currentPosition,
@@ -218,7 +255,7 @@ export const useQuranTracker = () => {
         });
       }
     }, 1000);
-  }, [memorizedPages, currentPosition, lastReviewDate, reviewHistory, onboardingComplete, loading, authLoading, saveAllData]);
+  }, [memorizedPages, currentPosition, lastReviewDate, reviewHistory, onboardingComplete, loading, authLoading, dataLoaded, saveAllData]);
 
   // Track when we make local changes (not from cloud)
   const makeLocalChange = useCallback((updateFunction) => {
@@ -230,7 +267,7 @@ export const useQuranTracker = () => {
 
   // Auto-save when data changes (with better conflict prevention)
   useEffect(() => {
-    if (!isUpdatingFromCloud.current) {
+    if (!isUpdatingFromCloud.current && dataLoaded) {
       debouncedSave();
     }
     return () => {
@@ -238,20 +275,33 @@ export const useQuranTracker = () => {
         clearTimeout(saveTimeout.current);
       }
     };
-  }, [memorizedPages, currentPosition, lastReviewDate, reviewHistory, onboardingComplete, debouncedSave]);
+  }, [memorizedPages, currentPosition, lastReviewDate, reviewHistory, onboardingComplete, dataLoaded, debouncedSave]);
 
-  // Complete onboarding setup
+  // Enhanced complete onboarding setup with immediate state update
   const completeOnboardingSetup = useCallback((selectedPages) => {
     try {
-      makeLocalChange(() => {
-        setMemorizedPages(selectedPages);
-        setCurrentPosition(0);
-        setLastReviewDate(null);
-        setReviewHistory([]);
-        setOnboardingComplete(true);
-        setIsFirstTime(false);
-      });
-
+      console.log('Completing onboarding setup with pages:', selectedPages);
+      
+      // Update state immediately
+      setMemorizedPages(selectedPages);
+      setCurrentPosition(0);
+      setLastReviewDate(null);
+      setReviewHistory([]);
+      setOnboardingComplete(true);
+      setIsFirstTime(false);
+      
+      // Save to storage
+      const dataToSave = {
+        memorizedPages: selectedPages,
+        currentPosition: 0,
+        lastReviewDate: null,
+        reviewHistory: [],
+        onboardingComplete: true
+      };
+      
+      // Save immediately
+      saveAllData(dataToSave);
+      
       // Track onboarding completion for analytics
       console.log('Onboarding completed with', Object.keys(selectedPages).length, 'pages');
       
@@ -260,10 +310,15 @@ export const useQuranTracker = () => {
       console.error('Error completing onboarding:', error);
       return false;
     }
-  }, [makeLocalChange]);
+  }, [saveAllData]);
 
   // Check if should show onboarding
   const shouldShowOnboarding = useCallback((pages) => {
+    // If data is still loading, don't show onboarding yet
+    if (loading || authLoading || !dataLoaded) {
+      return false;
+    }
+    
     // Always show onboarding if explicitly first time and not complete
     if (isFirstTime && !onboardingComplete) {
       return true;
@@ -275,14 +330,22 @@ export const useQuranTracker = () => {
     }
     
     return false;
-  }, [isFirstTime, onboardingComplete]);
+  }, [isFirstTime, onboardingComplete, loading, authLoading, dataLoaded]);
 
-  // Handle sign in and data migration
+  // Enhanced handle sign in and data migration
   const handleSignInAndMigrate = async () => {
     try {
-      const signedInUser = await handleSignIn();
+      const result = await handleSignIn();
       
-      // Get current local data
+      if (result && result.hasExistingData && result.hasExistingData.hasData) {
+        // User has existing cloud data, it will be auto-loaded
+        console.log('Existing user with cloud data detected');
+        // Force reload data
+        setDataLoaded(false);
+        return result;
+      }
+      
+      // New user or user without cloud data - check for local data to migrate
       const localData = {
         memorizedPages,
         currentPosition,
@@ -291,19 +354,28 @@ export const useQuranTracker = () => {
         onboardingComplete
       };
 
-      // Check if cloud data exists and handle conflicts
-      const syncResult = await syncLocalDataToCloud(localData);
-      
-      if (syncResult?.needsResolution) {
-        // Show conflict resolution modal
-        setConflictData(syncResult);
-        setShowDataConflictModal(true);
-      } else {
-        // No conflict, migrate to cloud
-        await migrateToCloud(localData);
+      // Only migrate if user has local data
+      if (Object.keys(memorizedPages).length > 0) {
+        // Check if cloud data exists and handle conflicts
+        const syncResult = await syncLocalDataToCloud(localData);
+        
+        if (syncResult?.needsResolution) {
+          // Show conflict resolution modal
+          setConflictData(syncResult);
+          setShowDataConflictModal(true);
+        } else if (syncResult?.action === 'uploaded') {
+          // Successfully uploaded local data
+          console.log('Local data migrated to cloud');
+        } else if (syncResult?.action === 'used-cloud') {
+          // Used cloud data, reload
+          setDataLoaded(false);
+        }
       }
+      
+      return result;
     } catch (error) {
       console.error('Error signing in and migrating:', error);
+      throw error;
     }
   };
 
@@ -313,7 +385,7 @@ export const useQuranTracker = () => {
       if (useCloudData) {
         // Use cloud data
         const cloudData = conflictData.cloudData;
-        setMemorizedPages(cloudData.memorizedPages || defaultMemorizedPages);
+        setMemorizedPages(cloudData.memorizedPages || {});
         setCurrentPosition(cloudData.currentPosition || 0);
         setLastReviewDate(cloudData.lastReviewDate || null);
         setReviewHistory(cloudData.reviewHistory || []);
@@ -614,7 +686,7 @@ ${dataStr}
     setImportError,
     
     // Loading states
-    loading: loading || authLoading,
+    loading: loading || authLoading || !dataLoaded,
     
     // Cloud sync state
     user,
@@ -666,5 +738,6 @@ ${dataStr}
     dismissSignInBanner,
     switchToLocal,
     resolveDataConflict,
+    checkExistingUser,
   };
 };

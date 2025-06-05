@@ -1,12 +1,32 @@
-// OnboardingFlow.jsx - Complete onboarding experience
+// OnboardingFlow.jsx - Complete onboarding experience with sign-in option
 import { useState } from 'react';
 import { surahInfo } from './quranData.js';
 
-export const OnboardingFlow = ({ onComplete }) => {
+export const OnboardingFlow = ({ onComplete, onSignIn }) => {
   const [step, setStep] = useState('welcome'); // welcome, education, selection, complete
   const [selectedPages, setSelectedPages] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedSurahs, setExpandedSurahs] = useState(new Set());
+  const [isSigningIn, setIsSigningIn] = useState(false);
+
+  // Handle sign in for existing users
+  const handleSignIn = async () => {
+    setIsSigningIn(true);
+    try {
+      const result = await onSignIn();
+      // If user has existing data, onSignIn will handle navigation
+      // If not, continue with onboarding
+      if (!result || !result.hasExistingData) {
+        setIsSigningIn(false);
+        // User signed in but has no data, continue onboarding
+        setStep('education');
+      }
+    } catch (error) {
+      console.error('Sign in error:', error);
+      setIsSigningIn(false);
+      alert('Sign in failed. Please try again.');
+    }
+  };
 
   // Get medal counts and stats
   const getStats = () => {
@@ -108,7 +128,7 @@ export const OnboardingFlow = ({ onComplete }) => {
 
   const stats = getStats();
 
-  // Welcome Screen
+  // Welcome Screen with Sign In option
   if (step === 'welcome') {
     return (
       <div style={{
@@ -174,23 +194,106 @@ export const OnboardingFlow = ({ onComplete }) => {
             </ul>
           </div>
 
-          <button
-            onClick={() => setStep('education')}
-            style={{
-              backgroundColor: 'var(--success-color)',
-              color: 'white',
-              border: 'none',
-              padding: '16px 32px',
-              fontSize: '1.1rem',
-              fontWeight: 'bold',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              minWidth: '200px'
-            }}
-          >
-            Get Started 🚀
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <button
+              onClick={() => setStep('education')}
+              style={{
+                backgroundColor: 'var(--success-color)',
+                color: 'white',
+                border: 'none',
+                padding: '16px 32px',
+                fontSize: '1.1rem',
+                fontWeight: 'bold',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                minWidth: '200px'
+              }}
+            >
+              Get Started 🚀
+            </button>
+
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              marginTop: '1rem'
+            }}>
+              <div style={{
+                flex: 1,
+                height: '1px',
+                backgroundColor: 'var(--border-color)'
+              }} />
+              <span style={{
+                color: 'var(--text-secondary)',
+                fontSize: '0.9rem',
+                fontStyle: 'italic'
+              }}>
+                Already have an account?
+              </span>
+              <div style={{
+                flex: 1,
+                height: '1px',
+                backgroundColor: 'var(--border-color)'
+              }} />
+            </div>
+
+            <button
+              onClick={handleSignIn}
+              disabled={isSigningIn}
+              style={{
+                backgroundColor: 'var(--info-color)',
+                color: 'white',
+                border: 'none',
+                padding: '16px 32px',
+                fontSize: '1.1rem',
+                fontWeight: 'bold',
+                borderRadius: '12px',
+                cursor: isSigningIn ? 'not-allowed' : 'pointer',
+                minWidth: '200px',
+                opacity: isSigningIn ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              {isSigningIn ? (
+                <>
+                  <span style={{
+                    display: 'inline-block',
+                    width: '16px',
+                    height: '16px',
+                    border: '2px solid white',
+                    borderRadius: '50%',
+                    borderTopColor: 'transparent',
+                    animation: 'spin 1s linear infinite'
+                  }} />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  🔗 Sign In with Google
+                </>
+              )}
+            </button>
+
+            <p style={{
+              fontSize: '0.85rem',
+              color: 'var(--text-secondary)',
+              marginTop: '0.5rem'
+            }}>
+              Sign in to sync your progress across devices
+            </p>
+          </div>
         </div>
+
+        <style>
+          {`
+            @keyframes spin {
+              to { transform: rotate(360deg); }
+            }
+          `}
+        </style>
       </div>
     );
   }
@@ -835,7 +938,10 @@ export const OnboardingFlow = ({ onComplete }) => {
               ← Adjust Pages
             </button>
             <button
-              onClick={() => onComplete(selectedPages)}
+              onClick={() => {
+                console.log('Completing onboarding with pages:', selectedPages);
+                onComplete(selectedPages);
+              }}
               style={{
                 backgroundColor: 'var(--success-color)',
                 color: 'white',

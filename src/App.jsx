@@ -80,6 +80,8 @@ export default function App() {
     // New onboarding functions
     completeOnboardingSetup,
     shouldShowOnboarding,
+    onboardingComplete,
+    checkExistingUser,
   } = useQuranTracker();
 
   const { migrateToCloud } = useStorage(user);
@@ -87,7 +89,6 @@ export default function App() {
   // Onboarding state
   const {
     isFirstTime,
-    onboardingComplete,
     showQualityUpgrade,
     currentUpgradePage,
     currentUpgradeQuality,
@@ -104,6 +105,7 @@ export default function App() {
   const [showAddPages, setShowAddPages] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  const [onboardingKey, setOnboardingKey] = useState(0); // Force re-render after onboarding
 
   // Setup theme on mount
   useEffect(() => {
@@ -189,6 +191,37 @@ export default function App() {
     }
   }, []);
 
+  // Enhanced onboarding completion handler
+  const handleOnboardingComplete = (selectedPages) => {
+    console.log('Onboarding completed with pages:', selectedPages);
+    const success = completeOnboardingSetup(selectedPages);
+    if (success) {
+      // Force re-render by changing key
+      setOnboardingKey(prev => prev + 1);
+    }
+  };
+
+  // Enhanced sign-in handler for onboarding
+  const handleOnboardingSignIn = async () => {
+    try {
+      const result = await handleSignInAndMigrate();
+      
+      if (result && result.hasExistingData && result.hasExistingData.hasData) {
+        // User has existing data, skip onboarding
+        console.log('Existing user detected, loading cloud data');
+        // Force re-render to exit onboarding
+        setOnboardingKey(prev => prev + 1);
+        return { hasExistingData: true };
+      }
+      
+      // New user or user without data
+      return { hasExistingData: false };
+    } catch (error) {
+      console.error('Error during onboarding sign-in:', error);
+      throw error;
+    }
+  };
+
   // Show loading spinner
   if (loading) {
     return (
@@ -211,15 +244,15 @@ export default function App() {
   if (shouldShowOnboarding(memorizedPages) || (isFirstTime && !onboardingComplete)) {
     return (
       <OnboardingFlow 
-        onComplete={(selectedPages) => {
-          completeOnboardingSetup(selectedPages);
-        }}
+        key={onboardingKey} // Force re-render when key changes
+        onComplete={handleOnboardingComplete}
+        onSignIn={handleOnboardingSignIn}
       />
     );
   }
 
   return (
-    <div style={styles.container}>
+    <div style={styles.container} key={`app-${onboardingKey}`}>
       {/* Sign-in Banner */}
       {showSignInBanner && (
         <div style={{
@@ -320,7 +353,8 @@ export default function App() {
                   memorizedPages,
                   currentPosition,
                   lastReviewDate,
-                  reviewHistory
+                  reviewHistory,
+                  onboardingComplete: true
                 });
               }}
             >
@@ -386,7 +420,7 @@ export default function App() {
                   💾 Local Data
                 </h4>
                 <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: '0' }}>
-                  {Object.keys(memorizedPages).length} pages memorized
+                  {conflictData.localPageCount || Object.keys(memorizedPages).length} pages memorized
                   <br />
                   Last review: {lastReviewDate || 'Never'}
                 </p>
@@ -402,7 +436,7 @@ export default function App() {
                   ☁️ Cloud Data
                 </h4>
                 <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: '0' }}>
-                  {Object.keys(conflictData.cloudData.memorizedPages || {}).length} pages memorized
+                  {conflictData.cloudPageCount || Object.keys(conflictData.cloudData.memorizedPages || {}).length} pages memorized
                   <br />
                   Last review: {conflictData.cloudData.lastReviewDate || 'Never'}
                 </p>
