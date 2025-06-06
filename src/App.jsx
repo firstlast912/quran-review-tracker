@@ -9,6 +9,7 @@ import { OnboardingFlow } from './OnboardingFlow.jsx';
 import { 
   TodaysReviewEnhanced, 
   QualityUpgradeModal, 
+  BatchQualityUpgradeModal,
   ProgressDashboard, 
   AddPagesFlow, 
   CycleComplete, 
@@ -106,6 +107,8 @@ export default function App() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [onboardingKey, setOnboardingKey] = useState(0); // Force re-render after onboarding
+  const [showBatchQualityUpgrade, setShowBatchQualityUpgrade] = useState(false);
+  const [batchUpgradePages, setBatchUpgradePages] = useState([]);
 
   // Setup theme on mount
   useEffect(() => {
@@ -143,13 +146,31 @@ export default function App() {
     };
   }, []);
 
-  // Enhanced complete review with quality upgrade prompt
+  // Enhanced complete review with batch quality upgrade prompt
   const handleCompleteReview = () => {
     if (todaysPages.length > 0) {
-      // Show quality upgrade for the first page reviewed
-      const firstPage = todaysPages[0];
-      triggerQualityUpgrade(firstPage.page, firstPage.color);
+      // Show batch quality upgrade modal for all today's pages
+      triggerBatchQualityUpgrade(todaysPages);
     }
+    // Don't complete review yet - wait for quality updates
+  };
+
+  // Trigger batch quality upgrade modal
+  const triggerBatchQualityUpgrade = (pages) => {
+    setBatchUpgradePages(pages);
+    setShowBatchQualityUpgrade(true);
+  };
+
+  // Handle batch quality upgrades
+  const handleBatchQualityUpgrade = (pageNum, quality) => {
+    changePageColor(pageNum, quality);
+  };
+
+  // Close batch upgrade and complete review
+  const closeBatchUpgrade = () => {
+    setShowBatchQualityUpgrade(false);
+    setBatchUpgradePages([]);
+    // Now complete the review
     completeReview();
   };
 
@@ -507,6 +528,7 @@ export default function App() {
           reviewHistory={reviewHistory}
           currentPosition={currentPosition}
           memorizedPagesList={memorizedPagesList}
+          todaysPages={todaysPages}
         />
       )}
 
@@ -777,15 +799,12 @@ export default function App() {
         </p>
       </div>
 
-      {/* Enhanced Modals */}
-      {showQualityUpgrade && (
-        <QualityUpgradeModal
-          page={currentUpgradePage}
-          currentQuality={currentUpgradeQuality}
-          onUpgrade={(page, quality) => {
-            handleQualityUpgrade(page, quality, changePageColor);
-          }}
-          onClose={closeQualityUpgrade}
+      {/* Batch Quality Upgrade Modal */}
+      {showBatchQualityUpgrade && batchUpgradePages.length > 0 && (
+        <BatchQualityUpgradeModal
+          pages={batchUpgradePages}
+          onUpgrade={handleBatchQualityUpgrade}
+          onClose={closeBatchUpgrade}
         />
       )}
 

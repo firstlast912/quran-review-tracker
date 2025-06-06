@@ -432,12 +432,13 @@ export const useQuranTracker = () => {
   };
 
   const changePageColor = (pageNum, color) => {
-    makeLocalChange(() => {
+    makeLocalChange(async () => {
       const oldColor = memorizedPages[pageNum];
-      setMemorizedPages((prev) => ({
-        ...prev,
+      const newMemorizedPages = {
+        ...memorizedPages,
         [pageNum]: color,
-      }));
+      };
+      setMemorizedPages(newMemorizedPages);
       
       // Track quality change
       if (oldColor !== color) {
@@ -445,12 +446,29 @@ export const useQuranTracker = () => {
                          oldColor !== 'red' && color === 'red' ? 'downgrade' : 'change';
         medalHelpers.trackQualityChange(pageNum, oldColor, color, direction);
       }
+      
+      // Immediate save for quality changes
+      try {
+        console.log('Saving quality change to cloud/storage...');
+        const dataToSave = {
+          memorizedPages: newMemorizedPages,
+          currentPosition,
+          lastReviewDate,
+          reviewHistory,
+          onboardingComplete
+        };
+        
+        // Force immediate save
+        await saveAllData(dataToSave, true); // true = immediate
+      } catch (error) {
+        console.error('Error saving quality change:', error);
+      }
     });
   };
 
-  // Enhanced review management with cycle completion detection
+  // Enhanced review management with immediate cloud save
   const completeReview = () => {
-    makeLocalChange(() => {
+    makeLocalChange(async () => {
       const newPosition = currentPosition + todaysPages.length;
       const reviewDate = new Date().toLocaleDateString();
       const cycleCompleted = newPosition >= memorizedPagesList.length;
@@ -467,17 +485,35 @@ export const useQuranTracker = () => {
         cycleCompleted,
       };
 
+      // Update state first
       setReviewHistory((prev) => [newHistoryEntry, ...prev].slice(0, 30));
 
       if (cycleCompleted) {
         setCurrentPosition(0);
-        
-        // Could trigger cycle completion celebration here
         console.log('🎉 Cycle completed!');
       } else {
         setCurrentPosition(newPosition);
       }
       setLastReviewDate(reviewDate);
+
+      // CRITICAL: Save immediately to cloud/storage
+      try {
+        console.log('Saving review completion to cloud/storage...');
+        const dataToSave = {
+          memorizedPages,
+          currentPosition: cycleCompleted ? 0 : newPosition,
+          lastReviewDate: reviewDate,
+          reviewHistory: [newHistoryEntry, ...reviewHistory].slice(0, 30),
+          onboardingComplete
+        };
+        
+        // Force immediate save (not debounced)
+        const result = await saveAllData(dataToSave, true); // true = immediate
+        console.log('Review save result:', result);
+      } catch (error) {
+        console.error('Error saving review completion:', error);
+        // Still show success to user, but log the error
+      }
     });
   };
 

@@ -93,10 +93,11 @@ export const OnboardingFlow = ({ onComplete, onSignIn }) => {
     });
   };
 
-  // Quick add options
-  const addQuickSelection = (type) => {
+  // Quick add options - TOGGLE functionality
+  const toggleQuickSelection = (type) => {
     setSelectedPages(prev => {
       const newPages = { ...prev };
+      let pagesToToggle = [];
       
       if (type === 'last10') {
         // Last 10 surahs (105-114)
@@ -104,26 +105,68 @@ export const OnboardingFlow = ({ onComplete, onSignIn }) => {
           const surah = surahInfo.find(s => s.number === surahNum);
           if (surah) {
             for (let page = surah.startPage; page <= surah.endPage; page++) {
-              newPages[page] = 'super-green'; // Usually well-known
+              pagesToToggle.push(page);
             }
           }
         }
       } else if (type === 'fatihah') {
-        newPages[1] = 'super-green'; // Al-Fatihah
+        pagesToToggle = [1]; // Al-Fatihah
       } else if (type === 'short') {
         // Common short surahs (110-114)
         for (let surahNum = 110; surahNum <= 114; surahNum++) {
           const surah = surahInfo.find(s => s.number === surahNum);
           if (surah) {
             for (let page = surah.startPage; page <= surah.endPage; page++) {
-              newPages[page] = 'super-green';
+              pagesToToggle.push(page);
             }
           }
         }
       }
       
+      // Check if all pages are already selected
+      const allSelected = pagesToToggle.every(page => newPages[page]);
+      
+      if (allSelected) {
+        // Remove all pages
+        pagesToToggle.forEach(page => delete newPages[page]);
+      } else {
+        // Add all pages with super-green quality
+        pagesToToggle.forEach(page => {
+          newPages[page] = 'super-green';
+        });
+      }
+      
       return newPages;
     });
+  };
+  
+  // Helper to check if quick selection is active
+  const isQuickSelectionActive = (type) => {
+    let pagesToCheck = [];
+    
+    if (type === 'last10') {
+      for (let surahNum = 105; surahNum <= 114; surahNum++) {
+        const surah = surahInfo.find(s => s.number === surahNum);
+        if (surah) {
+          for (let page = surah.startPage; page <= surah.endPage; page++) {
+            pagesToCheck.push(page);
+          }
+        }
+      }
+    } else if (type === 'fatihah') {
+      pagesToCheck = [1];
+    } else if (type === 'short') {
+      for (let surahNum = 110; surahNum <= 114; surahNum++) {
+        const surah = surahInfo.find(s => s.number === surahNum);
+        if (surah) {
+          for (let page = surah.startPage; page <= surah.endPage; page++) {
+            pagesToCheck.push(page);
+          }
+        }
+      }
+    }
+    
+    return pagesToCheck.length > 0 && pagesToCheck.every(page => selectedPages[page]);
   };
 
   const stats = getStats();
@@ -518,46 +561,49 @@ export const OnboardingFlow = ({ onComplete, onSignIn }) => {
             </h3>
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
               <button
-                onClick={() => addQuickSelection('fatihah')}
+                onClick={() => toggleQuickSelection('fatihah')}
                 style={{
-                  backgroundColor: 'var(--info-color)',
+                  backgroundColor: isQuickSelectionActive('fatihah') ? 'var(--success-color)' : 'var(--info-color)',
                   color: 'white',
                   border: 'none',
                   padding: '8px 16px',
                   borderRadius: '8px',
                   cursor: 'pointer',
-                  fontSize: '0.9rem'
+                  fontSize: '0.9rem',
+                  fontWeight: isQuickSelectionActive('fatihah') ? 'bold' : 'normal'
                 }}
               >
-                + Al-Fatihah
+                {isQuickSelectionActive('fatihah') ? '✓' : '+'} Al-Fatihah
               </button>
               <button
-                onClick={() => addQuickSelection('short')}
+                onClick={() => toggleQuickSelection('short')}
                 style={{
-                  backgroundColor: 'var(--info-color)',
+                  backgroundColor: isQuickSelectionActive('short') ? 'var(--success-color)' : 'var(--info-color)',
                   color: 'white',
                   border: 'none',
                   padding: '8px 16px',
                   borderRadius: '8px',
                   cursor: 'pointer',
-                  fontSize: '0.9rem'
+                  fontSize: '0.9rem',
+                  fontWeight: isQuickSelectionActive('short') ? 'bold' : 'normal'
                 }}
               >
-                + Short Surahs (110-114)
+                {isQuickSelectionActive('short') ? '✓' : '+'} Short Surahs (110-114)
               </button>
               <button
-                onClick={() => addQuickSelection('last10')}
+                onClick={() => toggleQuickSelection('last10')}
                 style={{
-                  backgroundColor: 'var(--info-color)',
+                  backgroundColor: isQuickSelectionActive('last10') ? 'var(--success-color)' : 'var(--info-color)',
                   color: 'white',
                   border: 'none',
                   padding: '8px 16px',
                   borderRadius: '8px',
                   cursor: 'pointer',
-                  fontSize: '0.9rem'
+                  fontSize: '0.9rem',
+                  fontWeight: isQuickSelectionActive('last10') ? 'bold' : 'normal'
                 }}
               >
-                + Last 10 Surahs (105-114)
+                {isQuickSelectionActive('last10') ? '✓' : '+'} Last 10 Surahs (105-114)
               </button>
             </div>
           </div>

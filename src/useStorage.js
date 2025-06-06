@@ -48,18 +48,22 @@ export const useStorage = (user) => {
             
             // Load from Firebase
             const userData = await getUserData(user.uid);
-            return userData?.[key] || defaultValue;
+            console.log(`Loaded ${key} from cloud:`, userData?.[key]);
+            return userData?.[key] !== undefined ? userData[key] : defaultValue;
           }
         } else {
           // User has cloud sync enabled, load from Firebase
           const userData = await getUserData(user.uid);
-          return userData?.[key] || defaultValue;
+          console.log(`Loaded ${key} from cloud:`, userData?.[key]);
+          return userData?.[key] !== undefined ? userData[key] : defaultValue;
         }
       }
       
       // Load from localStorage for non-signed-in users or users without cloud data
       const stored = localStorage.getItem(key);
-      return stored ? JSON.parse(stored) : defaultValue;
+      const parsed = stored ? JSON.parse(stored) : defaultValue;
+      console.log(`Loaded ${key} from localStorage:`, parsed);
+      return parsed;
     } catch (error) {
       console.error(`Error loading ${key}:`, error);
       // Fallback to localStorage
@@ -97,17 +101,30 @@ export const useStorage = (user) => {
   }, [user, isCloudSync]);
 
   // Batch save all data at once (more efficient for real-time sync)
-  const saveAllData = useCallback(async (dataObject) => {
+  const saveAllData = useCallback(async (dataObject, immediate = false) => {
     try {
       setSyncStatus('syncing');
       
+      // For immediate saves, log it
+      if (immediate) {
+        console.log('Immediate save requested for:', Object.keys(dataObject));
+      }
+      
       if (user && isCloudSync) {
-        await saveUserData(user.uid, dataObject);
+        // Add timestamp to ensure data is fresh
+        const dataWithTimestamp = {
+          ...dataObject,
+          lastUpdated: new Date().toISOString()
+        };
+        
+        await saveUserData(user.uid, dataWithTimestamp);
+        console.log('Data saved to cloud successfully');
       } else {
         // Save each piece to localStorage
         Object.entries(dataObject).forEach(([key, value]) => {
           localStorage.setItem(key, JSON.stringify(value));
         });
+        console.log('Data saved to localStorage successfully');
       }
       
       setSyncStatus('idle');
@@ -183,11 +200,17 @@ export const useStorage = (user) => {
       console.log('Setting up real-time listener for user:', user.uid);
       
       const unsubscribe = subscribeToUserData(user.uid, (cloudData) => {
-        console.log('Received cloud update:', cloudData);
+        console.log('Received cloud update:', {
+          currentPosition: cloudData.currentPosition,
+          lastReviewDate: cloudData.lastReviewDate,
+          memorizedPagesCount: Object.keys(cloudData.memorizedPages || {}).length,
+          reviewHistoryCount: (cloudData.reviewHistory || []).length
+        });
         
         // Prevent infinite loops by checking if data actually changed
         const cloudDataString = JSON.stringify(cloudData);
         if (lastCloudUpdateRef.current === cloudDataString) {
+          console.log('Cloud data unchanged, skipping update');
           return;
         }
         lastCloudUpdateRef.current = cloudDataString;

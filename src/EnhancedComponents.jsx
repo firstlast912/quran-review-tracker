@@ -243,7 +243,212 @@ export const TodaysReviewEnhanced = ({
   );
 };
 
-// Quality Upgrade Modal Component
+// Batch Quality Upgrade Modal Component - NEW!
+export const BatchQualityUpgradeModal = ({ pages, onUpgrade, onClose }) => {
+  // Initialize state with current qualities
+  const [selectedQualities, setSelectedQualities] = useState(() => {
+    const qualities = {};
+    pages.forEach(page => {
+      qualities[page.page] = page.color;
+    });
+    return qualities;
+  });
+
+  const handleQualityChange = (pageNum, newQuality) => {
+    setSelectedQualities(prev => ({
+      ...prev,
+      [pageNum]: newQuality
+    }));
+  };
+
+  const handleSubmit = () => {
+    // Call onUpgrade for each page with its new quality
+    Object.entries(selectedQualities).forEach(([pageNum, quality]) => {
+      const originalPage = pages.find(p => p.page === parseInt(pageNum));
+      if (originalPage && originalPage.color !== quality) {
+        onUpgrade(parseInt(pageNum), quality);
+      }
+    });
+    onClose();
+  };
+
+  // Check if any qualities have changed
+  const hasChanges = pages.some(page => 
+    selectedQualities[page.page] !== page.color
+  );
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 1000,
+      padding: '1rem',
+      overflowY: 'auto'
+    }}>
+      <div style={{
+        backgroundColor: 'var(--bg-primary)',
+        borderRadius: '12px',
+        padding: '2rem',
+        maxWidth: '600px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflowY: 'auto',
+        border: '2px solid var(--border-color)'
+      }}>
+        <h3 style={{
+          fontSize: '1.3rem',
+          marginBottom: '1rem',
+          color: 'var(--text-primary)',
+          textAlign: 'center'
+        }}>
+          📖 Daily Review Complete!
+        </h3>
+
+        <p style={{
+          fontSize: '1rem',
+          color: 'var(--text-secondary)',
+          marginBottom: '1.5rem',
+          textAlign: 'center'
+        }}>
+          How did your review go for each page?
+        </p>
+
+        <div style={{
+          backgroundColor: 'var(--bg-secondary)',
+          padding: '1rem',
+          borderRadius: '8px',
+          marginBottom: '1.5rem'
+        }}>
+          <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+            <strong>Quick Guide:</strong>
+          </div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+            • <strong>🥉 Bronze:</strong> Still struggling or need more practice<br />
+            • <strong>🥈 Silver:</strong> Can recall with some effort and concentration<br />
+            • <strong>🥇 Gold:</strong> Confident recall AND have used it in prayer
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '2rem' }}>
+          {pages.map((page, index) => (
+            <div key={page.page} style={{
+              marginBottom: '1rem',
+              padding: '1rem',
+              backgroundColor: 'var(--bg-secondary)',
+              borderRadius: '8px',
+              border: '2px solid var(--border-color)'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '1rem'
+              }}>
+                <div style={{ flex: '1', minWidth: '150px' }}>
+                  <div style={{ 
+                    fontSize: '1.1rem', 
+                    fontWeight: 'bold', 
+                    color: 'var(--text-primary)',
+                    marginBottom: '0.25rem'
+                  }}>
+                    Page {page.page}
+                  </div>
+                  <div style={{ 
+                    fontSize: '0.85rem', 
+                    color: 'var(--text-secondary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    Currently: <MedalBadge quality={page.color} size="small" />
+                  </div>
+                </div>
+                
+                <div style={{ minWidth: '200px' }}>
+                  <QualitySelector
+                    value={selectedQualities[page.page]}
+                    onChange={(quality) => handleQualityChange(page.page, quality)}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              </div>
+
+              {selectedQualities[page.page] !== page.color && (
+                <div style={{
+                  marginTop: '0.5rem',
+                  padding: '0.5rem',
+                  backgroundColor: 'var(--bg-accent)',
+                  borderRadius: '6px',
+                  fontSize: '0.85rem',
+                  color: 'var(--info-color)',
+                  fontWeight: 'bold'
+                }}>
+                  {selectedQualities[page.page] === 'super-green' && page.color !== 'super-green' && 
+                    '⬆️ Upgrading to Gold!'
+                  }
+                  {selectedQualities[page.page] === 'green' && page.color === 'red' && 
+                    '⬆️ Upgrading to Silver!'
+                  }
+                  {selectedQualities[page.page] === 'red' && page.color !== 'red' && 
+                    '⬇️ Downgrading to Bronze'
+                  }
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ 
+          display: 'flex', 
+          gap: '1rem',
+          marginTop: '1.5rem'
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              backgroundColor: 'var(--text-secondary)',
+              color: 'white',
+              border: 'none',
+              padding: '12px 24px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              flex: 1,
+              fontSize: '1rem'
+            }}
+          >
+            Skip
+          </button>
+          <button
+            onClick={handleSubmit}
+            style={{
+              backgroundColor: 'var(--success-color)',
+              color: 'white',
+              border: 'none',
+              padding: '12px 24px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              flex: 2,
+              fontSize: '1rem'
+            }}
+          >
+            {hasChanges ? 'Update & Continue' : 'Continue'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Quality Upgrade Modal Component (keeping for backward compatibility)
 export const QualityUpgradeModal = ({ page, currentQuality, onUpgrade, onClose }) => {
   const [selectedQuality, setSelectedQuality] = useState(currentQuality);
 
@@ -424,12 +629,13 @@ export const QualityUpgradeModal = ({ page, currentQuality, onUpgrade, onClose }
   );
 };
 
-// Progress Dashboard Component
+// Progress Dashboard Component - UPDATED with Today's Pages
 export const ProgressDashboard = ({
   memorizedPages,
   reviewHistory,
   currentPosition,
-  memorizedPagesList
+  memorizedPagesList,
+  todaysPages = [] // New prop
 }) => {
   const getQualityStats = () => {
     const entries = Object.entries(memorizedPages);
@@ -471,6 +677,73 @@ export const ProgressDashboard = ({
       }}>
         📊 Progress Dashboard
       </h3>
+
+      {/* Today's Pages Section - NEW! */}
+      {todaysPages && todaysPages.length > 0 && (
+        <div style={{
+          backgroundColor: 'var(--bg-accent)',
+          border: '2px solid var(--accent-color)',
+          padding: '1.5rem',
+          borderRadius: '12px',
+          marginBottom: '2rem'
+        }}>
+          <h4 style={{ 
+            fontSize: '1.2rem', 
+            marginBottom: '1rem', 
+            color: 'var(--text-primary)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            📚 Today's Review Pages
+          </h4>
+          
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+            gap: '1rem'
+          }}>
+            {todaysPages.map((page, idx) => (
+              <div key={idx} style={{
+                backgroundColor: 'var(--bg-primary)',
+                padding: '1rem',
+                borderRadius: '8px',
+                textAlign: 'center',
+                border: '2px solid var(--border-color)'
+              }}>
+                <div style={{ 
+                  fontSize: '1.1rem', 
+                  fontWeight: 'bold', 
+                  color: 'var(--text-primary)',
+                  marginBottom: '0.5rem'
+                }}>
+                  Page {page.page}
+                </div>
+                <MedalBadge quality={page.color} size="small" />
+                <div style={{
+                  fontSize: '0.8rem',
+                  color: 'var(--text-secondary)',
+                  marginTop: '0.5rem'
+                }}>
+                  {getRank(page.color)} points
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div style={{
+            marginTop: '1rem',
+            padding: '0.75rem',
+            backgroundColor: 'var(--bg-primary)',
+            borderRadius: '8px',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+              Total Difficulty: <strong>{todaysPages.reduce((sum, page) => sum + getRank(page.color), 0)}/4 points</strong>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quality Distribution */}
       <div style={{
