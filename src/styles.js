@@ -326,39 +326,6 @@ export const styles = {
     minWidth: '200px',
   },
   
-  // Tab bar styles
-  tabBar: {
-    display: 'flex',
-    backgroundColor: 'var(--bg-secondary)',
-    borderRadius: '12px',
-    padding: '4px',
-    marginBottom: '1rem',
-    gap: '4px',
-  },
-  
-  tabButton: {
-    flex: 1,
-    padding: '12px 16px',
-    backgroundColor: 'transparent',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '0.9rem',
-    fontWeight: '600',
-    color: 'var(--text-secondary)',
-    transition: 'all 0.2s ease',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.5rem',
-  },
-  
-  activeTab: {
-    backgroundColor: 'var(--bg-primary)',
-    color: 'var(--text-primary)',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-  },
-  
   input: {
     padding: '12px 16px',
     fontSize: '16px',
