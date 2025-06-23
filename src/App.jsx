@@ -532,6 +532,8 @@ export default function App() {
           currentPosition={currentPosition}
           memorizedPagesList={memorizedPagesList}
           todaysPages={todaysPages}
+          remainingDays={remainingDays}
+          estimatedCycleDuration={estimatedCycleDuration}
         />
       )}
 

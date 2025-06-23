@@ -94,54 +94,6 @@ export const TodaysReviewEnhanced = ({
         🌅 Today's Review
       </h2>
 
-      <div style={{ marginBottom: '1.5rem' }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-          gap: '1rem',
-          marginBottom: '1rem'
-        }}>
-          <div style={{
-            backgroundColor: 'var(--bg-primary)',
-            padding: '1rem',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
-              {currentPosition + 1}
-            </div>
-            <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              of {memorizedPagesList.length} pages
-            </div>
-          </div>
-          <div style={{
-            backgroundColor: 'var(--bg-primary)',
-            padding: '1rem',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
-              {remainingDays}
-            </div>
-            <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              days remaining
-            </div>
-          </div>
-          <div style={{
-            backgroundColor: 'var(--bg-primary)',
-            padding: '1rem',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
-              {estimatedCycleDuration}
-            </div>
-            <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              day cycle
-            </div>
-          </div>
-        </div>
-      </div>
 
       {todaysPages.length > 0 && (
         <div style={{ marginBottom: '2rem' }}>
@@ -635,7 +587,9 @@ export const ProgressDashboard = ({
   reviewHistory,
   currentPosition,
   memorizedPagesList,
-  todaysPages = [] // New prop
+  todaysPages = [], // New prop
+  remainingDays,
+  estimatedCycleDuration
 }) => {
   const getQualityStats = () => {
     const entries = Object.entries(memorizedPages);
@@ -678,72 +632,56 @@ export const ProgressDashboard = ({
         📊 Progress Dashboard
       </h3>
 
-      {/* Today's Pages Section - NEW! */}
-      {todaysPages && todaysPages.length > 0 && (
+      {/* Cycle Progress Stats */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+        gap: '1rem',
+        marginBottom: '2rem'
+      }}>
         <div style={{
-          backgroundColor: 'var(--bg-accent)',
-          border: '2px solid var(--accent-color)',
-          padding: '1.5rem',
-          borderRadius: '12px',
-          marginBottom: '2rem'
+          backgroundColor: 'var(--bg-primary)',
+          padding: '1rem',
+          borderRadius: '8px',
+          textAlign: 'center',
+          border: '1px solid var(--border-color)'
         }}>
-          <h4 style={{ 
-            fontSize: '1.2rem', 
-            marginBottom: '1rem', 
-            color: 'var(--text-primary)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            📚 Today's Review Pages
-          </h4>
-          
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-            gap: '1rem'
-          }}>
-            {todaysPages.map((page, idx) => (
-              <div key={idx} style={{
-                backgroundColor: 'var(--bg-primary)',
-                padding: '1rem',
-                borderRadius: '8px',
-                textAlign: 'center',
-                border: '2px solid var(--border-color)'
-              }}>
-                <div style={{ 
-                  fontSize: '1.1rem', 
-                  fontWeight: 'bold', 
-                  color: 'var(--text-primary)',
-                  marginBottom: '0.5rem'
-                }}>
-                  Page {page.page}
-                </div>
-                <MedalBadge quality={page.color} size="small" />
-                <div style={{
-                  fontSize: '0.8rem',
-                  color: 'var(--text-secondary)',
-                  marginTop: '0.5rem'
-                }}>
-                  {getRank(page.color)} points
-                </div>
-              </div>
-            ))}
+          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+            {currentPosition + 1}
           </div>
-          
-          <div style={{
-            marginTop: '1rem',
-            padding: '0.75rem',
-            backgroundColor: 'var(--bg-primary)',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              Total Difficulty: <strong>{todaysPages.reduce((sum, page) => sum + getRank(page.color), 0)}/4 points</strong>
-            </div>
+          <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+            of {memorizedPagesList.length} pages
           </div>
         </div>
-      )}
+        <div style={{
+          backgroundColor: 'var(--bg-primary)',
+          padding: '1rem',
+          borderRadius: '8px',
+          textAlign: 'center',
+          border: '1px solid var(--border-color)'
+        }}>
+          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+            {remainingDays}
+          </div>
+          <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+            days remaining
+          </div>
+        </div>
+        <div style={{
+          backgroundColor: 'var(--bg-primary)',
+          padding: '1rem',
+          borderRadius: '8px',
+          textAlign: 'center',
+          border: '1px solid var(--border-color)'
+        }}>
+          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+            {estimatedCycleDuration}
+          </div>
+          <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+            day cycle
+          </div>
+        </div>
+      </div>
 
       {/* Quality Distribution */}
       <div style={{
