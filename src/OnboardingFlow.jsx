@@ -347,6 +347,7 @@ export const OnboardingFlow = ({ onComplete, onSignIn }) => {
       <div style={{
         minHeight: '100vh',
         backgroundColor: 'var(--bg-primary)',
+        position: 'relative',
         padding: '2rem'
       }}>
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
@@ -537,8 +538,31 @@ export const OnboardingFlow = ({ onComplete, onSignIn }) => {
       <div style={{
         minHeight: '100vh',
         backgroundColor: 'var(--bg-primary)',
-        padding: '2rem'
+        padding: '2rem',
+        position: 'relative'
       }}>
+        {/* Back Button */}
+        <button
+          onClick={() => setStep('education')}
+          style={{
+            position: 'absolute',
+            top: '1rem',
+            left: '1rem',
+            backgroundColor: 'transparent',
+            border: '1px solid var(--border-color)',
+            color: 'var(--text-primary)',
+            padding: '8px 16px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '0.9rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          ← Back
+        </button>
+        
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <h1 style={{ fontSize: '2rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>
@@ -861,6 +885,28 @@ export const OnboardingFlow = ({ onComplete, onSignIn }) => {
         padding: '2rem',
         textAlign: 'center'
       }}>
+        {/* Back Button */}
+        <button
+          onClick={() => setStep('welcome')}
+          style={{
+            position: 'absolute',
+            top: '1rem',
+            left: '1rem',
+            backgroundColor: 'transparent',
+            border: '1px solid var(--border-color)',
+            color: 'var(--text-primary)',
+            padding: '8px 16px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '0.9rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          ← Back
+        </button>
+        
         <div style={{ maxWidth: '600px' }}>
           <div style={{ fontSize: '4rem', marginBottom: '2rem' }}>🎉</div>
           

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useQuranTracker } from './useQuranTracker.js';
 import { surahInfo, getRank } from './quranData.js';
 import { useStorage } from './useStorage.js';
+import { getUserData } from './firebase.js';
 import { setupTheme, styles, getColorStyle } from './styles.js';
 import { useOnboarding } from './useOnboarding.js';
 import { OnboardingFlow } from './OnboardingFlow.jsx';
@@ -109,12 +110,63 @@ export default function App() {
   const [onboardingKey, setOnboardingKey] = useState(0); // Force re-render after onboarding
   const [showBatchQualityUpgrade, setShowBatchQualityUpgrade] = useState(false);
   const [batchUpgradePages, setBatchUpgradePages] = useState([]);
+  const [activeTab, setActiveTab] = useState('review'); // New tab state
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [touchStart, setTouchStart] = useState(0);
+  const [touchEnd, setTouchEnd] = useState(0);
 
   // Setup theme on mount
   useEffect(() => {
     const cleanup = setupTheme();
     return cleanup;
   }, []);
+
+  // Handle pull-to-refresh
+  const handleRefresh = async () => {
+    if (isRefreshing) return;
+    
+    setIsRefreshing(true);
+    
+    // Perform refresh actions
+    try {
+      // If user is signed in and using cloud sync, sync with cloud
+      if (user && isCloudSync) {
+        // Force a re-read from cloud (this will trigger via the subscription)
+        await getUserData(user.uid);
+      }
+      
+      // Recalculate today's pages (in case date changed)
+      // This happens automatically via the hook
+      
+      // Small delay to show refresh animation
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+      console.error('Refresh error:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Touch handlers for pull-to-refresh
+  const handleTouchStart = (e) => {
+    setTouchStart(e.targetTouches[0].clientY);
+  };
+
+  const handleTouchMove = (e) => {
+    setTouchEnd(e.targetTouches[0].clientY);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isScrolledToTop = window.scrollY === 0;
+    const isPullDown = distance < -100; // Pulled down at least 100px
+    
+    if (isScrolledToTop && isPullDown && !isRefreshing) {
+      handleRefresh();
+    }
+  };
 
   // Handle PWA install prompt
   useEffect(() => {
@@ -273,7 +325,43 @@ export default function App() {
   }
 
   return (
-    <div style={styles.container} key={`app-${onboardingKey}`}>
+    <div 
+      style={styles.container} 
+      key={`app-${onboardingKey}`}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Refresh Indicator */}
+      {isRefreshing && (
+        <div style={{
+          position: 'fixed',
+          top: '1rem',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          backgroundColor: 'var(--info-color)',
+          color: 'white',
+          padding: '0.75rem 1.5rem',
+          borderRadius: '24px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          <span style={{
+            display: 'inline-block',
+            width: '16px',
+            height: '16px',
+            border: '2px solid white',
+            borderRadius: '50%',
+            borderTopColor: 'transparent',
+            animation: 'spin 1s linear infinite'
+          }} />
+          Refreshing...
+        </div>
+      )}
+      
       {/* Sign-in Banner */}
       {showSignInBanner && (
         <div style={{
@@ -500,32 +588,67 @@ export default function App() {
         onCompleteReview={handleCompleteReview}
       />
 
-      {/* Enhanced Action Buttons */}
-      <div style={styles.flexWrap}>
+      {/* Tab Navigation */}
+      <div style={styles.tabBar}>
         <button
-          style={{ ...styles.button, ...styles.secondaryButton }}
-          onClick={() => setShowPageSelector(!showPageSelector)}
+          style={{
+            ...styles.tabButton,
+            ...(activeTab === 'review' ? styles.activeTab : {})
+          }}
+          onClick={() => setActiveTab('review')}
         >
-          {showPageSelector ? '🙈 Hide' : '👁️ Show'} Pages
+          📖 Review
         </button>
-
         <button
-          style={{ ...styles.button, ...styles.warningButton }}
-          onClick={() => setShowOverview(!showOverview)}
+          style={{
+            ...styles.tabButton,
+            ...(activeTab === 'progress' ? styles.activeTab : {})
+          }}
+          onClick={() => setActiveTab('progress')}
         >
-          {showOverview ? '📊 Hide' : '📈 Show'} Overview
+          📊 Progress
         </button>
-
         <button
-          style={{ ...styles.button, ...styles.primaryButton }}
-          onClick={() => setShowAddPages(true)}
+          style={{
+            ...styles.tabButton,
+            ...(activeTab === 'manage' ? styles.activeTab : {})
+          }}
+          onClick={() => setActiveTab('manage')}
         >
-          📝 Add Pages
+          📝 Manage
         </button>
       </div>
 
-      {/* Enhanced Progress Overview */}
-      {showOverview && (
+      {/* Tab Content */}
+      {activeTab === 'review' && (
+        <div style={styles.card}>
+          <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>
+            📅 Review Information
+          </h3>
+          <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+            <p>Last Review: {lastReviewDate || 'Never'}</p>
+            <p>Total Reviews Completed: {reviewHistory.length}</p>
+            {todaysPages.length === 0 && (
+              <div style={{
+                padding: '2rem',
+                textAlign: 'center',
+                backgroundColor: 'var(--bg-accent)',
+                borderRadius: '8px',
+                marginTop: '1rem'
+              }}>
+                <p style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>
+                  ✅ No pages to review today!
+                </p>
+                <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                  Come back tomorrow for your next review session.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'progress' && (
         <ProgressDashboard
           memorizedPages={memorizedPages}
           reviewHistory={reviewHistory}
@@ -537,8 +660,7 @@ export default function App() {
         />
       )}
 
-      {/* Enhanced Page Selector */}
-      {showPageSelector && (
+      {activeTab === 'manage' && (
         <div style={styles.card}>
           <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', color: 'var(--text-primary)' }}>
             📝 Manage Your Pages
@@ -692,117 +814,94 @@ export default function App() {
             })}
           </div>
         </div>
-      )}
-
-      {/* Enhanced Statistics */}
-      <div style={styles.card}>
-        <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>
-          📊 Medal Distribution
-        </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '1rem', fontSize: '0.875rem' }}>
-          <div style={{ textAlign: 'center', padding: '0.75rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '8px' }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
-              {memorizedPagesList.length}
-            </div>
-            <div style={{ color: 'var(--text-secondary)' }}>📖 Total Pages</div>
+          {/* Add Pages Button */}
+          <div style={{ marginBottom: '2rem' }}>
+            <button
+              style={{ ...styles.button, ...styles.primaryButton, width: '100%' }}
+              onClick={() => setShowAddPages(true)}
+            >
+              ➕ Add New Pages
+            </button>
           </div>
-          <div style={{ textAlign: 'center', padding: '0.75rem', backgroundColor: '#CD7F32', color: 'white', borderRadius: '8px' }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-              {memorizedPagesList.filter((p) => p.color === 'red').length}
-            </div>
-            <div style={{ fontSize: '0.875rem' }}>🥉 Bronze</div>
-          </div>
-          <div style={{ textAlign: 'center', padding: '0.75rem', backgroundColor: '#C0C0C0', color: 'white', borderRadius: '8px' }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-              {memorizedPagesList.filter((p) => p.color === 'green').length}
-            </div>
-            <div style={{ fontSize: '0.875rem' }}>🥈 Silver</div>
-          </div>
-          <div style={{ textAlign: 'center', padding: '0.75rem', backgroundColor: '#FFD700', color: '#333', borderRadius: '8px' }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-              {memorizedPagesList.filter((p) => p.color === 'super-green').length}
-            </div>
-            <div style={{ fontSize: '0.875rem' }}>🥇 Gold</div>
-          </div>
-        </div>
-      </div>
 
-      {/* Data Management Section */}
-      <div style={styles.card}>
-        <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', textAlign: 'center', color: 'var(--text-primary)' }}>
-          💾 Data Management
-        </h3>
-
-        <div style={styles.flexWrap}>
-          <button
-            style={{ ...styles.button, ...styles.primaryButton }}
-            onClick={exportData}
-          >
-            📥 Export
-          </button>
-
-          <button
-            style={{ ...styles.button, ...styles.secondaryButton }}
-            onClick={emailData}
-          >
-            📧 Email
-          </button>
-
-          <button
-            style={{ ...styles.button, backgroundColor: '#9C27B0', color: 'white' }}
-            onClick={copyToClipboard}
-          >
-            📋 Copy
-          </button>
-
-          <label style={{ ...styles.button, ...styles.warningButton, textAlign: 'center' }}>
-            📤 Import
-            <input
-              type="file"
-              accept=".json"
-              onChange={importData}
-              style={{ display: 'none' }}
-            />
-          </label>
-        </div>
-
-        {importError && (
+          {/* Data Management Section */}
           <div style={{
-            padding: '1rem',
-            backgroundColor: 'var(--danger-color)',
-            color: 'white',
-            borderRadius: '8px',
-            fontSize: '0.875rem',
-            marginBottom: '1rem',
-            textAlign: 'center'
+            backgroundColor: 'var(--bg-secondary)',
+            padding: '1.5rem',
+            borderRadius: '12px',
+            marginBottom: '2rem'
           }}>
-            ❌ {importError}
+            <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>
+              💾 Data Management
+            </h4>
+
+            <div style={styles.flexWrap}>
+              <button
+                style={{ ...styles.button, ...styles.primaryButton }}
+                onClick={exportData}
+              >
+                📥 Export
+              </button>
+
+              <button
+                style={{ ...styles.button, ...styles.secondaryButton }}
+                onClick={emailData}
+              >
+                📧 Email
+              </button>
+
+              <button
+                style={{ ...styles.button, backgroundColor: '#9C27B0', color: 'white' }}
+                onClick={copyToClipboard}
+              >
+                📋 Copy
+              </button>
+
+              <label style={{ ...styles.button, ...styles.warningButton, textAlign: 'center' }}>
+                📤 Import
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={importData}
+                  style={{ display: 'none' }}
+                />
+              </label>
+            </div>
+
+            {importError && (
+              <div style={{
+                padding: '1rem',
+                backgroundColor: 'var(--danger-color)',
+                color: 'white',
+                borderRadius: '8px',
+                fontSize: '0.875rem',
+                marginBottom: '1rem',
+                textAlign: 'center'
+              }}>
+                ❌ {importError}
+              </div>
+            )}
+
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '1rem' }}>
+              <strong>Export:</strong> Download backup • <strong>Email:</strong> Open in email app •{' '}
+              <strong>Copy:</strong> Copy to clipboard • <strong>Import:</strong> Restore from backup
+            </div>
           </div>
-        )}
 
-        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
-          <strong>Export:</strong> Download backup • <strong>Email:</strong> Open in email app •{' '}
-          <strong>Copy:</strong> Copy to clipboard • <strong>Import:</strong> Restore from backup
+          {/* Reset Position */}
+          <div style={{ textAlign: 'center' }}>
+            <button
+              style={{ ...styles.button, ...styles.dangerButton }}
+              onClick={resetPosition}
+            >
+              🔄 Reset Position
+            </button>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+              This will restart your review cycle from the beginning
+            </p>
+          </div>
         </div>
-      </div>
-
-      {/* Reset Button */}
-      <div style={{ 
-        textAlign: 'center', 
-        marginTop: '2rem', 
-        paddingTop: '2rem', 
-        borderTop: '1px solid var(--border-color)' 
-      }}>
-        <button
-          style={{ ...styles.button, ...styles.dangerButton }}
-          onClick={resetPosition}
-        >
-          🔄 Reset Position
-        </button>
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '1rem' }}>
-          Your data is {isCloudSync ? 'synced to the cloud' : 'saved locally'}
-        </p>
-      </div>
+      )}
 
       {/* Batch Quality Upgrade Modal */}
       {showBatchQualityUpgrade && batchUpgradePages.length > 0 && (
