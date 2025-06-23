@@ -385,11 +385,14 @@ export default function App() {
             <button
               style={{
                 ...styles.button,
-                backgroundColor: 'var(--text-secondary)',
+                backgroundColor: '#6c757d',
                 color: 'white',
                 minWidth: 'auto',
                 padding: '8px 16px',
-                fontSize: '14px'
+                fontSize: '14px',
+                border: '1px solid #6c757d',
+                WebkitAppearance: 'none',
+                appearance: 'none'
               }}
               onClick={handleSignOut}
             >
