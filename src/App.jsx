@@ -500,27 +500,57 @@ export default function App() {
         onCompleteReview={handleCompleteReview}
       />
 
-      {/* Enhanced Action Buttons */}
-      <div style={styles.flexWrap}>
-        <button
-          style={{ ...styles.button, ...styles.secondaryButton }}
-          onClick={() => setShowPageSelector(!showPageSelector)}
-        >
-          {showPageSelector ? '🙈 Hide' : '👁️ Show'} Pages
-        </button>
+      {/* Enhanced Action Section with Toggles */}
+      <div style={{ 
+        ...styles.card,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '1rem'
+      }}>
+        <div style={{ display: 'flex', gap: '2rem', flex: 1 }}>
+          {/* Pages Toggle */}
+          <div style={styles.toggleContainer}>
+            <span style={styles.toggleLabel}>📝 Pages</span>
+            <div 
+              style={{
+                ...styles.toggleSwitch,
+                ...(showPageSelector ? styles.toggleSwitchActive : {})
+              }}
+              onClick={() => setShowPageSelector(!showPageSelector)}
+            >
+              <div style={{
+                ...styles.toggleSlider,
+                ...(showPageSelector ? styles.toggleSliderActive : {})
+              }} />
+            </div>
+          </div>
 
-        <button
-          style={{ ...styles.button, ...styles.warningButton }}
-          onClick={() => setShowOverview(!showOverview)}
-        >
-          {showOverview ? '📊 Hide' : '📈 Show'} Overview
-        </button>
+          {/* Overview Toggle */}
+          <div style={styles.toggleContainer}>
+            <span style={styles.toggleLabel}>📊 Overview</span>
+            <div 
+              style={{
+                ...styles.toggleSwitch,
+                ...(showOverview ? styles.toggleSwitchActive : {})
+              }}
+              onClick={() => setShowOverview(!showOverview)}
+            >
+              <div style={{
+                ...styles.toggleSlider,
+                ...(showOverview ? styles.toggleSliderActive : {})
+              }} />
+            </div>
+          </div>
+        </div>
 
+        {/* Add Pages Button */}
         <button
-          style={{ ...styles.button, ...styles.primaryButton }}
+          style={{ ...styles.button, ...styles.primaryButton, minWidth: '140px' }}
           onClick={() => setShowAddPages(true)}
         >
-          📝 Add Pages
+          ➕ Add Pages
         </button>
       </div>
 

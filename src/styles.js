@@ -326,6 +326,51 @@ export const styles = {
     minWidth: '200px',
   },
   
+  // Toggle switch styles
+  toggleContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    padding: '0.5rem',
+  },
+  
+  toggleSwitch: {
+    position: 'relative',
+    width: '48px',
+    height: '24px',
+    backgroundColor: 'var(--border-color)',
+    borderRadius: '24px',
+    cursor: 'pointer',
+    transition: 'background-color 0.3s ease',
+  },
+  
+  toggleSwitchActive: {
+    backgroundColor: 'var(--success-color)',
+  },
+  
+  toggleSlider: {
+    position: 'absolute',
+    top: '2px',
+    left: '2px',
+    width: '20px',
+    height: '20px',
+    backgroundColor: 'white',
+    borderRadius: '50%',
+    transition: 'transform 0.3s ease',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+  },
+  
+  toggleSliderActive: {
+    transform: 'translateX(24px)',
+  },
+  
+  toggleLabel: {
+    fontSize: '0.9rem',
+    fontWeight: '500',
+    color: 'var(--text-primary)',
+    userSelect: 'none',
+  },
+  
   input: {
     padding: '12px 16px',
     fontSize: '16px',
